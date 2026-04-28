@@ -3,11 +3,20 @@
 import { FormEvent, useState } from "react";
 
 export default function RegisterPage() {
+  return <RegisterView mode="customer" />;
+}
+
+export function RegisterView({ mode = "customer" }: { mode?: "customer" | "driver" }) {
   const [error, setError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    if (mode === "driver") {
+      return;
+    }
+
     const fd = new FormData(event.currentTarget);
     const payload = Object.fromEntries(fd.entries());
 
@@ -26,9 +35,23 @@ export default function RegisterPage() {
     window.location.href = "/account";
   }
 
+  if (mode === "driver") {
+    return (
+      <section className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6">
+        <h1 className="text-3xl font-bold">Driver Register</h1>
+        <p className="mt-3 text-slate-700">
+          Driver onboarding, document verification, and availability setup are coming in the next phase.
+        </p>
+        <p className="mt-2 text-slate-700">
+          For now, please use Driver Login if you were invited for testing.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6">
-      <h1 className="text-3xl font-bold">Create Account</h1>
+      <h1 className="text-3xl font-bold">Create Customer Account</h1>
       <form onSubmit={handleSubmit} className="mt-6 grid gap-4 sm:grid-cols-2">
         <Input label="Email" name="email" type="email" required />
         <Input label="Password" name="password" type="password" required />

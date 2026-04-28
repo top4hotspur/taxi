@@ -6,8 +6,11 @@ import { useState } from "react";
 import { navLinks } from "@/lib/siteContent";
 
 const utilityLinks = [
-  { label: "Login", href: "/login" },
-  { label: "Account", href: "/account" },
+  { label: "Customer Login", href: "/customer/login" },
+  { label: "Driver Login", href: "/driver/login" },
+  { label: "Customer Register", href: "/customer/register" },
+  { label: "Driver Register", href: "/driver/register" },
+  // TODO: Hide Admin navigation link before production launch.
   { label: "Admin", href: "/admin" },
 ];
 
