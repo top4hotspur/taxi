@@ -21,6 +21,7 @@
     "resend": "^6.12.2"
   },
   "devDependencies": {
+    "@aws-amplify/backend-cli": "^1.8.2",
     "@aws-sdk/eventstream-handler-node": "^3.821.0",
     "@aws-sdk/middleware-eventstream": "^3.821.0",
     "@aws-sdk/types": "^3.821.0",
