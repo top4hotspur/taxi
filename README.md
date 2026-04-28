@@ -119,6 +119,26 @@ Temporary implementation:
 
 If the key is missing or the script fails to load, quote form location fields automatically fall back to manual text input.
 
+### 7) Quote troubleshooting commands
+Use these to diagnose live submission issues:
+
+```bash
+curl -i -X POST https://www.nitaxico.com/api/quote \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Diag User","email":"diag@example.com","phone":"123","serviceType":"Airport transfer","pickupLocation":"Belfast","dropoffLocation":"Dublin Airport","pickupDate":"2026-05-01","pickupTime":"09:30","passengers":"2"}'
+```
+
+```bash
+curl -i -X POST https://<your-amplify-temp-domain>.amplifyapp.com/api/quote \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Diag User","email":"diag@example.com","phone":"123","serviceType":"Airport transfer","pickupLocation":"Belfast","dropoffLocation":"Dublin Airport","pickupDate":"2026-05-01","pickupTime":"09:30","passengers":"2"}'
+```
+
+```bash
+nslookup www.nitaxico.com 8.8.8.8
+nslookup www.nitaxico.com
+```
+
 ## Scope guardrails
 - Driver onboarding: not included.
 - Square payments: not included.

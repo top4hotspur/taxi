@@ -14,6 +14,18 @@ const TABLE_DRIVER_PROFILES = process.env.DDB_TABLE_DRIVER_PROFILES || "NITaxiDr
 const TABLE_DRIVER_DOCUMENTS = process.env.DDB_TABLE_DRIVER_DOCUMENTS || "NITaxiDriverDocuments";
 const TABLE_DRIVER_REMINDER_LOGS = process.env.DDB_TABLE_DRIVER_REMINDER_LOGS || "NITaxiDriverReminderLogs";
 
+const REQUIRED_DB_ENV_VARS = [
+  "AWS_REGION",
+  "DDB_TABLE_USERS",
+  "DDB_TABLE_CUSTOMER_PROFILES",
+  "DDB_TABLE_QUOTES",
+  "DDB_TABLE_BOOKINGS",
+  "DDB_TABLE_QUOTE_AUDITS",
+  "DDB_TABLE_DRIVER_PROFILES",
+  "DDB_TABLE_DRIVER_DOCUMENTS",
+  "DDB_TABLE_DRIVER_REMINDER_LOGS",
+] as const;
+
 type Role = "CUSTOMER" | "ADMIN" | "DRIVER";
 
 export interface UserRecord { id: string; email: string; passwordHash: string; role: Role; createdAt: string; updatedAt: string }
@@ -71,6 +83,24 @@ export interface DriverReminderLogRecord {
 function now() { return new Date().toISOString(); }
 function id() { return crypto.randomUUID(); }
 
+export class DbConfigMissingError extends Error {
+  code = "DB_CONFIG_MISSING" as const;
+  missingEnvVars: string[];
+
+  constructor(missingEnvVars: string[]) {
+    super(`Missing required DB env vars: ${missingEnvVars.join(", ")}`);
+    this.name = "DbConfigMissingError";
+    this.missingEnvVars = missingEnvVars;
+  }
+}
+
+function assertDbWriteConfig() {
+  const missing = REQUIRED_DB_ENV_VARS.filter((envName) => !process.env[envName]?.trim());
+  if (missing.length > 0) {
+    throw new DbConfigMissingError([...missing]);
+  }
+}
+
 export const db = {
   async findUserByEmail(email: string) {
     const result = await ddb.send(new ScanCommand({ TableName: TABLE_USERS, FilterExpression: "email = :email", ExpressionAttributeValues: { ":email": email.toLowerCase() }, Limit: 1 }));
@@ -83,18 +113,21 @@ export const db = {
   },
 
   async createUser(user: Omit<UserRecord, "id" | "createdAt" | "updatedAt">) {
+    assertDbWriteConfig();
     const record: UserRecord = { ...user, id: id(), createdAt: now(), updatedAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_USERS, Item: record }));
     return record;
   },
 
   async createCustomerProfile(profile: Omit<CustomerProfileRecord, "id" | "createdAt" | "updatedAt">) {
+    assertDbWriteConfig();
     const record: CustomerProfileRecord = { ...profile, id: id(), createdAt: now(), updatedAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_CUSTOMER_PROFILES, Item: record }));
     return record;
   },
 
   async createOrUpdateDriverProfile(input: Omit<DriverProfileRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }) {
+    assertDbWriteConfig();
     const existing = await this.getDriverProfileByUserId(input.userId);
     const record: DriverProfileRecord = existing
       ? { ...existing, ...input, updatedAt: now() }
@@ -119,12 +152,14 @@ export const db = {
   },
 
   async createDriverDocument(document: Omit<DriverDocumentRecord, "id" | "createdAt" | "updatedAt">) {
+    assertDbWriteConfig();
     const record: DriverDocumentRecord = { ...document, id: id(), createdAt: now(), updatedAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_DOCUMENTS, Item: record }));
     return record;
   },
 
   async updateDriverDocument(documentId: string, patch: Partial<DriverDocumentRecord>) {
+    assertDbWriteConfig();
     const existing = await this.getDriverDocumentById(documentId);
     if (!existing) return null;
     const record = { ...existing, ...patch, updatedAt: now() };
@@ -143,6 +178,7 @@ export const db = {
   },
 
   async createDriverReminderLog(log: Omit<DriverReminderLogRecord, "id" | "sentAt">) {
+    assertDbWriteConfig();
     const record: DriverReminderLogRecord = { ...log, id: id(), sentAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_REMINDER_LOGS, Item: record }));
     return record;
@@ -161,12 +197,14 @@ export const db = {
   },
 
   async createQuote(quote: Omit<QuoteRecord, "id" | "createdAt" | "updatedAt">) {
+    assertDbWriteConfig();
     const record: QuoteRecord = { ...quote, id: id(), createdAt: now(), updatedAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_QUOTES, Item: record }));
     return record;
   },
 
   async updateQuote(quoteId: string, patch: Partial<QuoteRecord>) {
+    assertDbWriteConfig();
     const current = await this.findQuoteById(quoteId);
     if (!current) return null;
     const next = { ...current, ...patch, updatedAt: now() };
@@ -201,6 +239,7 @@ export const db = {
   },
 
   async upsertBooking(quoteId: string, confirmed: boolean) {
+    assertDbWriteConfig();
     const existing = await this.getBookingForQuote(quoteId);
     if (!existing) {
       const record: BookingRecord = { id: id(), quoteId, confirmed, createdAt: now(), updatedAt: now() };
@@ -218,6 +257,7 @@ export const db = {
   },
 
   async createAudit(audit: Omit<QuoteAuditRecord, "id" | "createdAt">) {
+    assertDbWriteConfig();
     const record: QuoteAuditRecord = { ...audit, id: id(), createdAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_QUOTE_AUDITS, Item: record }));
     return record;

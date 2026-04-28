@@ -1,6 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import crypto from "node:crypto";
+import { NextResponse } from "next/server";
 
 import { getCurrentSessionUser } from "@/lib/auth/guards";
+import { DbConfigMissingError } from "@/lib/db";
 import { createQuote } from "@/lib/quote/service";
 
 const required = [
@@ -16,6 +18,7 @@ const required = [
 ] as const;
 
 export async function POST(request: Request) {
+  const correlationId = crypto.randomUUID();
   let quoteSaved = false;
   let emailAttempted = false;
   let emailSkipped = false;
@@ -28,7 +31,9 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             ok: false,
+            errorCode: "VALIDATION_FAILED",
             error: `Missing required field: ${field}`,
+            correlationId,
             quoteSaved,
             emailAttempted,
             emailSkipped,
@@ -50,7 +55,9 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
+          errorCode: "VALIDATION_FAILED",
           error: "Invalid passengers value.",
+          correlationId,
           quoteSaved,
           emailAttempted,
           emailSkipped,
@@ -97,28 +104,51 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       success: true,
+      correlationId,
       quoteId: result.quote.id,
       quoteSaved,
       emailAttempted,
       emailSkipped,
       emailSent: result.email.requesterEmail.ok,
+      ...(result.email.requesterEmail.ok ? {} : { errorCode: "EMAIL_FAILED_NON_BLOCKING" }),
       message: session
         ? "Quote request saved to your account."
         : `${guestMessageBase}${guestEmailMessage} Create an account using the same email to track your request.`,
     });
   } catch (error) {
-    console.error("[api/quote] submit failed", {
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    let errorCode: "DB_CONFIG_MISSING" | "DB_WRITE_FAILED" | "UNKNOWN_ERROR" = "UNKNOWN_ERROR";
+    let errorMessage = "Unable to submit quote request at the moment. Please try again.";
+    const status = 500;
+
+    if (error instanceof DbConfigMissingError) {
+      errorCode = "DB_CONFIG_MISSING";
+      errorMessage = `Quote service is not configured. Missing: ${error.missingEnvVars.join(", ")}`;
+    } else if (error instanceof Error) {
+      errorCode = "DB_WRITE_FAILED";
+      errorMessage = "Unable to save your quote request right now. Please try again shortly.";
+    }
+
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "api.quote",
+        correlationId,
+        errorCode,
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
+
     return NextResponse.json(
       {
         ok: false,
-        error: "Unable to submit quote request at the moment. Please try again.",
+        errorCode,
+        error: errorMessage,
+        correlationId,
         quoteSaved,
         emailAttempted,
         emailSkipped,
       },
-      { status: 500 }
+      { status }
     );
   }
 }

@@ -58,16 +58,20 @@ export default function QuoteForm() {
       });
 
       const bodyText = await response.text();
-      let result: { message?: string; error?: string; ok?: boolean } = {};
+      let result: { message?: string; error?: string; ok?: boolean; errorCode?: string; correlationId?: string } = {};
       if (bodyText) {
         try {
-          result = JSON.parse(bodyText) as { message?: string; error?: string; ok?: boolean };
+          result = JSON.parse(bodyText) as { message?: string; error?: string; ok?: boolean; errorCode?: string; correlationId?: string };
         } catch {
           result = {};
         }
       }
       if (!response.ok) {
-        throw new Error(result.error || result.message || `Unable to submit quote request (status ${response.status}).`);
+        const details = [result.errorCode ? `Code: ${result.errorCode}` : "", result.correlationId ? `Ref: ${result.correlationId}` : ""]
+          .filter(Boolean)
+          .join(" | ");
+        const suffix = details ? ` (${details})` : "";
+        throw new Error((result.error || result.message || `Unable to submit quote request (status ${response.status}).`) + suffix);
       }
 
       setStatus("success");
