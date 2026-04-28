@@ -10,6 +10,8 @@ const TABLE_CUSTOMER_PROFILES = process.env.DDB_TABLE_CUSTOMER_PROFILES || "NITa
 const TABLE_QUOTES = process.env.DDB_TABLE_QUOTES || "NITaxiQuotes";
 const TABLE_BOOKINGS = process.env.DDB_TABLE_BOOKINGS || "NITaxiBookings";
 const TABLE_QUOTE_AUDITS = process.env.DDB_TABLE_QUOTE_AUDITS || "NITaxiQuoteAudits";
+const TABLE_DRIVER_PROFILES = process.env.DDB_TABLE_DRIVER_PROFILES || "NITaxiDriverProfiles";
+const TABLE_DRIVER_DOCUMENTS = process.env.DDB_TABLE_DRIVER_DOCUMENTS || "NITaxiDriverDocuments";
 
 type Role = "CUSTOMER" | "ADMIN" | "DRIVER";
 
@@ -18,6 +20,43 @@ export interface CustomerProfileRecord { id: string; userId: string; accountType
 export interface QuoteRecord { id: string; customerId?: string; guestEmail?: string; guestName?: string; guestPhone?: string; accountType: string; serviceType: string; pickupLocation: string; dropoffLocation: string; pickupDate: string; pickupTime: string; passengers: number; luggage?: string; golfBags?: number; returnJourney: boolean; itineraryMessage?: string; adminNotes?: string; quotedPrice?: number; quotedCurrency: string; status: string; createdAt: string; updatedAt: string }
 export interface BookingRecord { id: string; quoteId: string; confirmed: boolean; createdAt: string; updatedAt: string }
 export interface QuoteAuditRecord { id: string; quoteId: string; changedByRole: string; changedByUserId?: string; previousStatus?: string; newStatus: string; note?: string; createdAt: string }
+
+export interface DriverProfileRecord {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  mobile: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  carMake: string;
+  carModel: string;
+  registrationNumber: string;
+  passengerCapacity: number;
+  suitcaseCapacity: number;
+  profilePhoto?: string | null;
+  status: "PENDING" | "INCOMPLETE" | "ACTIVE" | "SUSPENDED";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DriverDocumentRecord {
+  id: string;
+  userId: string;
+  type: "TAXI_LICENCE" | "TAXI_CAR_LICENCE" | "INSURANCE" | "DRIVING_LICENCE";
+  uploadedFileReference: string;
+  expiryDate?: string | null;
+  status: "MISSING" | "UPLOADED" | "APPROVED" | "REJECTED" | "EXPIRED";
+  adminNotes?: string | null;
+  uploadedAt: string;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 function now() { return new Date().toISOString(); }
 function id() { return crypto.randomUUID(); }
@@ -43,6 +82,54 @@ export const db = {
     const record: CustomerProfileRecord = { ...profile, id: id(), createdAt: now(), updatedAt: now() };
     await ddb.send(new PutCommand({ TableName: TABLE_CUSTOMER_PROFILES, Item: record }));
     return record;
+  },
+
+  async createOrUpdateDriverProfile(input: Omit<DriverProfileRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }) {
+    const existing = await this.getDriverProfileByUserId(input.userId);
+    const record: DriverProfileRecord = existing
+      ? { ...existing, ...input, updatedAt: now() }
+      : { ...input, id: id(), createdAt: now(), updatedAt: now() };
+    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_PROFILES, Item: record }));
+    return record;
+  },
+
+  async getDriverProfileByUserId(userId: string) {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_DRIVER_PROFILES, FilterExpression: "userId = :userId", ExpressionAttributeValues: { ":userId": userId }, Limit: 1 }));
+    return (result.Items?.[0] as DriverProfileRecord | undefined) || undefined;
+  },
+
+  async getDriverProfileById(profileId: string) {
+    const result = await ddb.send(new GetCommand({ TableName: TABLE_DRIVER_PROFILES, Key: { id: profileId } }));
+    return result.Item as DriverProfileRecord | undefined;
+  },
+
+  async listDriverProfiles() {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_DRIVER_PROFILES }));
+    return ((result.Items as DriverProfileRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async createDriverDocument(document: Omit<DriverDocumentRecord, "id" | "createdAt" | "updatedAt">) {
+    const record: DriverDocumentRecord = { ...document, id: id(), createdAt: now(), updatedAt: now() };
+    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_DOCUMENTS, Item: record }));
+    return record;
+  },
+
+  async updateDriverDocument(documentId: string, patch: Partial<DriverDocumentRecord>) {
+    const existing = await this.getDriverDocumentById(documentId);
+    if (!existing) return null;
+    const record = { ...existing, ...patch, updatedAt: now() };
+    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_DOCUMENTS, Item: record }));
+    return record;
+  },
+
+  async getDriverDocumentById(documentId: string) {
+    const result = await ddb.send(new GetCommand({ TableName: TABLE_DRIVER_DOCUMENTS, Key: { id: documentId } }));
+    return result.Item as DriverDocumentRecord | undefined;
+  },
+
+  async listDriverDocumentsByUserId(userId: string) {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_DRIVER_DOCUMENTS, FilterExpression: "userId = :userId", ExpressionAttributeValues: { ":userId": userId } }));
+    return ((result.Items as DriverDocumentRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
   async createQuote(quote: Omit<QuoteRecord, "id" | "createdAt" | "updatedAt">) {

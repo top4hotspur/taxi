@@ -24,3 +24,11 @@ export async function requireAdmin() {
   }
   return user;
 }
+
+export async function requireDriver() {
+  const user = await getCurrentSessionUser();
+  if (!user || user.role !== "driver") {
+    redirect("/driver/login");
+  }
+  return user;
+}

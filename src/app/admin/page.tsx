@@ -41,9 +41,10 @@ export default function AdminPage() {
           ))}
         </div>
       )}
-      <div className="flex gap-4 text-sm">
+      <div className="flex flex-wrap gap-4 text-sm">
         <Link href="/admin/quotes" className="underline">Manage Quotes</Link>
         <Link href="/admin/customers" className="underline">View Customers</Link>
+        <Link href="/admin/drivers" className="underline">Manage Drivers</Link>
       </div>
     </section>
   );
