@@ -12,6 +12,7 @@ const TABLE_BOOKINGS = process.env.DDB_TABLE_BOOKINGS || "NITaxiBookings";
 const TABLE_QUOTE_AUDITS = process.env.DDB_TABLE_QUOTE_AUDITS || "NITaxiQuoteAudits";
 const TABLE_DRIVER_PROFILES = process.env.DDB_TABLE_DRIVER_PROFILES || "NITaxiDriverProfiles";
 const TABLE_DRIVER_DOCUMENTS = process.env.DDB_TABLE_DRIVER_DOCUMENTS || "NITaxiDriverDocuments";
+const TABLE_DRIVER_REMINDER_LOGS = process.env.DDB_TABLE_DRIVER_REMINDER_LOGS || "NITaxiDriverReminderLogs";
 
 type Role = "CUSTOMER" | "ADMIN" | "DRIVER";
 
@@ -56,6 +57,15 @@ export interface DriverDocumentRecord {
   reviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DriverReminderLogRecord {
+  id: string;
+  driverId: string;
+  documentId?: string | null;
+  reminderType: string;
+  reminderKey: string;
+  sentAt: string;
 }
 
 function now() { return new Date().toISOString(); }
@@ -130,6 +140,24 @@ export const db = {
   async listDriverDocumentsByUserId(userId: string) {
     const result = await ddb.send(new ScanCommand({ TableName: TABLE_DRIVER_DOCUMENTS, FilterExpression: "userId = :userId", ExpressionAttributeValues: { ":userId": userId } }));
     return ((result.Items as DriverDocumentRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async createDriverReminderLog(log: Omit<DriverReminderLogRecord, "id" | "sentAt">) {
+    const record: DriverReminderLogRecord = { ...log, id: id(), sentAt: now() };
+    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_REMINDER_LOGS, Item: record }));
+    return record;
+  },
+
+  async getDriverReminderLogByKey(reminderKey: string) {
+    const result = await ddb.send(
+      new ScanCommand({
+        TableName: TABLE_DRIVER_REMINDER_LOGS,
+        FilterExpression: "reminderKey = :reminderKey",
+        ExpressionAttributeValues: { ":reminderKey": reminderKey },
+        Limit: 1,
+      })
+    );
+    return (result.Items?.[0] as DriverReminderLogRecord | undefined) || undefined;
   },
 
   async createQuote(quote: Omit<QuoteRecord, "id" | "createdAt" | "updatedAt">) {

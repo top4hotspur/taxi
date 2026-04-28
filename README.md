@@ -1,6 +1,6 @@
 ﻿# NI Taxi Co Platform
 
-Phase 1.2 Next.js + Amplify-ready booking/quote platform with production email delivery via Resend.
+Phase 3 Next.js + Amplify-ready booking/quote platform with production email delivery and driver compliance reminders.
 
 ## Stack
 - Next.js App Router + TypeScript + Tailwind
@@ -29,6 +29,12 @@ npm run build
 - `/admin/quotes`
 - `/admin/quotes/[id]`
 - `/admin/customers`
+- `/driver`
+- `/driver/profile`
+- `/driver/documents`
+- `/driver/availability`
+- `/admin/drivers`
+- `/admin/drivers/[id]`
 
 ## Email environment variables
 Set these in Amplify Hosting (and locally for real sending):
@@ -44,6 +50,9 @@ Set these in Amplify Hosting (and locally for real sending):
 - `DDB_TABLE_QUOTES`
 - `DDB_TABLE_BOOKINGS`
 - `DDB_TABLE_QUOTE_AUDITS`
+- `DDB_TABLE_DRIVER_PROFILES`
+- `DDB_TABLE_DRIVER_DOCUMENTS`
+- `DDB_TABLE_DRIVER_REMINDER_LOGS`
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
 
@@ -84,7 +93,18 @@ First admin user:
 9. Admin confirms booking; confirm customer email includes journey summary and driver-details placeholder.
 10. Verify quote/audit/booking records in DynamoDB.
 
+### 5) Driver compliance reminders (Phase 3)
+1. Ensure `ADMIN_EMAIL`, `SITE_URL`, and Resend variables are configured.
+2. Open `/admin/drivers` as an admin user.
+3. Click `Run driver compliance reminders`.
+4. Confirm summary counts are returned and emails are sent/logged.
+5. Confirm reminder dedupe in `DriverReminderLog` records.
+
+Temporary implementation:
+- Manual admin endpoint: `POST /api/admin/reminders/driver-compliance/run`
+- Future scheduled version: move to daily EventBridge + Amplify scheduled function trigger.
+
 ## Scope guardrails
 - Driver onboarding: not included.
 - Square payments: not included.
-- Reminder jobs: not included.
+- Driver reminders: manual admin trigger included; scheduled jobs not included yet.

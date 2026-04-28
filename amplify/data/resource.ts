@@ -64,6 +64,14 @@ const schema = a.schema({
     updatedAt: a.datetime().required(),
   }).authorization((allow) => [allow.group("admin")]),
 
+  DriverReminderLog: a.model({
+    driverId: a.id().required(),
+    documentId: a.id(),
+    reminderType: a.string().required(),
+    reminderKey: a.string().required(),
+    sentAt: a.datetime().required(),
+  }).authorization((allow) => [allow.group("admin")]),
+
   Quote: a.model({
     customerId: a.id(),
     guestEmail: a.string(),

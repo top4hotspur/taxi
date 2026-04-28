@@ -101,3 +101,55 @@ export function adminBookingConfirmedEmail(quote: QuoteRecord) {
     text: `Booking confirmed for quote ${quote.id}.\n\n${quoteSummary(quote)}`,
   };
 }
+
+export function driverMissingComplianceReminderEmail(params: {
+  driverName: string;
+  missingProfileFields: string[];
+  missingDocuments: string[];
+}) {
+  const profileLine = params.missingProfileFields.length
+    ? `Missing profile fields: ${params.missingProfileFields.join(", ")}`
+    : "Missing profile fields: None";
+  const docsLine = params.missingDocuments.length
+    ? `Missing documents: ${params.missingDocuments.join(", ")}`
+    : "Missing documents: None";
+  return {
+    subject: "Action needed: complete your NI Taxi Co driver onboarding",
+    text: `Hello ${params.driverName},\n\nYour driver onboarding is not complete yet.\n${profileLine}\n${docsLine}\n\nPlease update your profile and documents in the driver portal.\n${siteUrl}/driver/documents`,
+  };
+}
+
+export function driverDocumentExpiryWarningEmail(params: {
+  driverName: string;
+  documentType: string;
+  expiryDate: string;
+  weeksBefore: 6 | 4 | 2;
+}) {
+  return {
+    subject: `${params.documentType} expires in ${params.weeksBefore} weeks`,
+    text: `Hello ${params.driverName},\n\nYour ${params.documentType} is due to expire on ${params.expiryDate}.\nPlease upload an updated document before expiry to avoid interruptions.\n\nDriver portal: ${siteUrl}/driver/documents`,
+  };
+}
+
+export function driverDocumentExpiredEmail(params: {
+  driverName: string;
+  documentType: string;
+  expiryDate: string;
+}) {
+  return {
+    subject: `Urgent: ${params.documentType} has expired`,
+    text: `Hello ${params.driverName},\n\nYour ${params.documentType} expired on ${params.expiryDate} and is now marked EXPIRED.\nPlease upload a replacement document as soon as possible.\n\nDriver portal: ${siteUrl}/driver/documents`,
+  };
+}
+
+export function adminDriverComplianceAlertEmail(params: {
+  driverName: string;
+  driverEmail: string;
+  alertType: "MISSING_ONBOARDING" | "EXPIRY_WARNING" | "DOCUMENT_EXPIRED";
+  details: string;
+}) {
+  return {
+    subject: `Driver compliance alert: ${params.alertType} (${params.driverName})`,
+    text: `Driver: ${params.driverName}\nDriver email: ${params.driverEmail}\nAlert type: ${params.alertType}\n\n${params.details}`,
+  };
+}
