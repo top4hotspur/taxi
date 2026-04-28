@@ -2,7 +2,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
-const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "eu-west-1";
+const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
 
 const TABLE_USERS = process.env.DDB_TABLE_USERS || "NITaxiUsers";
@@ -15,7 +15,6 @@ const TABLE_DRIVER_DOCUMENTS = process.env.DDB_TABLE_DRIVER_DOCUMENTS || "NITaxi
 const TABLE_DRIVER_REMINDER_LOGS = process.env.DDB_TABLE_DRIVER_REMINDER_LOGS || "NITaxiDriverReminderLogs";
 
 const REQUIRED_DB_ENV_VARS = [
-  "AWS_REGION",
   "DDB_TABLE_USERS",
   "DDB_TABLE_CUSTOMER_PROFILES",
   "DDB_TABLE_QUOTES",
@@ -95,7 +94,11 @@ export class DbConfigMissingError extends Error {
 }
 
 function assertDbWriteConfig() {
-  const missing = REQUIRED_DB_ENV_VARS.filter((envName) => !process.env[envName]?.trim());
+  const missing: string[] = REQUIRED_DB_ENV_VARS.filter((envName) => !process.env[envName]?.trim());
+  const hasEffectiveRegion = Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim());
+  if (!hasEffectiveRegion) {
+    missing.push("APP_AWS_REGION|AWS_REGION");
+  }
   if (missing.length > 0) {
     throw new DbConfigMissingError([...missing]);
   }

@@ -29,7 +29,8 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     sessionRole: user.role,
-    awsRegionPresent: Boolean(process.env.AWS_REGION?.trim()),
+    appAwsRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim()),
+    effectiveRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim()),
     ddbTables,
     emailEnvConfigured,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),

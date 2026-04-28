@@ -44,7 +44,7 @@ Set these in Amplify Hosting (and locally for real sending):
 - `ADMIN_EMAIL`
 - `SITE_URL=https://www.nitaxico.com`
 - `SESSION_SECRET`
-- `AWS_REGION`
+- `APP_AWS_REGION=eu-west-2`
 - `DDB_TABLE_USERS`
 - `DDB_TABLE_CUSTOMER_PROFILES`
 - `DDB_TABLE_QUOTES`
