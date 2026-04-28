@@ -24,7 +24,15 @@ export interface CreateQuoteInput {
   accountType: AccountTypeValue;
   serviceType: string;
   pickupLocation: string;
+  pickupPlaceId?: string;
+  pickupAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
   dropoffLocation: string;
+  dropoffPlaceId?: string;
+  dropoffAddress?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
   pickupDate: string;
   pickupTime: string;
   passengers: number;
@@ -62,7 +70,15 @@ export async function createQuote(input: CreateQuoteInput) {
     accountType: input.accountType,
     serviceType: input.serviceType,
     pickupLocation: input.pickupLocation,
+    pickupPlaceId: input.pickupPlaceId,
+    pickupAddress: input.pickupAddress,
+    pickupLat: input.pickupLat,
+    pickupLng: input.pickupLng,
     dropoffLocation: input.dropoffLocation,
+    dropoffPlaceId: input.dropoffPlaceId,
+    dropoffAddress: input.dropoffAddress,
+    dropoffLat: input.dropoffLat,
+    dropoffLng: input.dropoffLng,
     pickupDate: input.pickupDate,
     pickupTime: input.pickupTime,
     passengers: input.passengers,

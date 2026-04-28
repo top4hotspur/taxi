@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { FormEvent, useState } from "react";
+import PlaceAutocompleteInput from "@/components/PlaceAutocompleteInput";
 
 const serviceTypes = [
   "Airport transfer",
@@ -31,7 +32,15 @@ export default function QuoteForm() {
       accountType: String(formData.get("accountType") || "PERSONAL"),
       serviceType: String(formData.get("serviceType") || ""),
       pickupLocation: String(formData.get("pickupLocation") || ""),
+      pickupPlaceId: String(formData.get("pickupPlaceId") || ""),
+      pickupAddress: String(formData.get("pickupAddress") || ""),
+      pickupLat: String(formData.get("pickupLat") || ""),
+      pickupLng: String(formData.get("pickupLng") || ""),
       dropoffLocation: String(formData.get("dropoffLocation") || ""),
+      dropoffPlaceId: String(formData.get("dropoffPlaceId") || ""),
+      dropoffAddress: String(formData.get("dropoffAddress") || ""),
+      dropoffLat: String(formData.get("dropoffLat") || ""),
+      dropoffLng: String(formData.get("dropoffLng") || ""),
       pickupDate: String(formData.get("pickupDate") || ""),
       pickupTime: String(formData.get("pickupTime") || ""),
       passengers: String(formData.get("passengers") || ""),
@@ -48,8 +57,18 @@ export default function QuoteForm() {
         body: JSON.stringify(payload),
       });
 
-      const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message || "Unable to submit quote request.");
+      const bodyText = await response.text();
+      let result: { message?: string; error?: string; ok?: boolean } = {};
+      if (bodyText) {
+        try {
+          result = JSON.parse(bodyText) as { message?: string; error?: string; ok?: boolean };
+        } catch {
+          result = {};
+        }
+      }
+      if (!response.ok) {
+        throw new Error(result.error || result.message || `Unable to submit quote request (status ${response.status}).`);
+      }
 
       setStatus("success");
       setMessage(result.message || "Quote submitted.");
@@ -69,8 +88,24 @@ export default function QuoteForm() {
         <SelectField label="Account type" name="accountType" options={["PERSONAL", "BUSINESS"]} required />
         <SelectField label="Service type" name="serviceType" options={serviceTypes} required />
         <InputField label="Number of passengers" name="passengers" type="number" min={1} required />
-        <InputField label="Pickup location" name="pickupLocation" required />
-        <InputField label="Drop-off location" name="dropoffLocation" required />
+        <PlaceAutocompleteInput
+          label="Pickup location"
+          required
+          locationNameField="pickupLocation"
+          placeIdField="pickupPlaceId"
+          addressField="pickupAddress"
+          latField="pickupLat"
+          lngField="pickupLng"
+        />
+        <PlaceAutocompleteInput
+          label="Drop-off location"
+          required
+          locationNameField="dropoffLocation"
+          placeIdField="dropoffPlaceId"
+          addressField="dropoffAddress"
+          latField="dropoffLat"
+          lngField="dropoffLng"
+        />
         <InputField label="Date" name="pickupDate" type="date" required />
         <InputField label="Time" name="pickupTime" type="time" required />
         <InputField label="Luggage" name="luggage" />

@@ -53,6 +53,7 @@ Set these in Amplify Hosting (and locally for real sending):
 - `DDB_TABLE_DRIVER_PROFILES`
 - `DDB_TABLE_DRIVER_DOCUMENTS`
 - `DDB_TABLE_DRIVER_REMINDER_LOGS`
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
 
@@ -103,6 +104,20 @@ First admin user:
 Temporary implementation:
 - Manual admin endpoint: `POST /api/admin/reminders/driver-compliance/run`
 - Future scheduled version: move to daily EventBridge + Amplify scheduled function trigger.
+
+### 6) Google Maps Places Autocomplete setup
+1. Create a Google Cloud project.
+2. Enable `Maps JavaScript API`.
+3. Enable `Places API`.
+4. Create a browser API key.
+5. Restrict key by HTTP referrer:
+   - `https://www.nitaxico.com/*`
+   - `https://*.amplifyapp.com/*`
+   - `http://localhost:3000/*`
+6. Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to Amplify environment variables.
+7. Redeploy.
+
+If the key is missing or the script fails to load, quote form location fields automatically fall back to manual text input.
 
 ## Scope guardrails
 - Driver onboarding: not included.

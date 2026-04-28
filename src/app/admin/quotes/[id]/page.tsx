@@ -3,7 +3,26 @@
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
-type Quote = { id: string; status: string; adminNotes?: string; quotedPrice?: string; quotedCurrency: string; serviceType: string; pickupLocation: string; dropoffLocation: string; guestEmail?: string; audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>; };
+type Quote = {
+  id: string;
+  status: string;
+  adminNotes?: string;
+  quotedPrice?: string;
+  quotedCurrency: string;
+  serviceType: string;
+  pickupLocation: string;
+  pickupPlaceId?: string;
+  pickupAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLocation: string;
+  dropoffPlaceId?: string;
+  dropoffAddress?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  guestEmail?: string;
+  audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>;
+};
 
 export default function AdminQuoteDetailPage() {
   const params = useParams<{ id: string }>();
@@ -63,7 +82,14 @@ export default function AdminQuoteDetailPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <p>Status: <strong>{quote.status}</strong></p>
         <p>Service: {quote.serviceType}</p>
-        <p>Route: {quote.pickupLocation} to {quote.dropoffLocation}</p>
+        <p>Pickup: {quote.pickupLocation}</p>
+        <p>Pickup address: {quote.pickupAddress || "Not provided"}</p>
+        <p>Pickup place ID: {quote.pickupPlaceId || "Not provided"}</p>
+        <p>Pickup coordinates: {quote.pickupLat !== undefined && quote.pickupLng !== undefined ? `${quote.pickupLat}, ${quote.pickupLng}` : "Not provided"}</p>
+        <p>Drop-off: {quote.dropoffLocation}</p>
+        <p>Drop-off address: {quote.dropoffAddress || "Not provided"}</p>
+        <p>Drop-off place ID: {quote.dropoffPlaceId || "Not provided"}</p>
+        <p>Drop-off coordinates: {quote.dropoffLat !== undefined && quote.dropoffLng !== undefined ? `${quote.dropoffLat}, ${quote.dropoffLng}` : "Not provided"}</p>
       </div>
 
       <form onSubmit={update} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
