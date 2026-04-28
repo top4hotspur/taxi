@@ -1,0 +1,86 @@
+﻿import { defineData, a, type ClientSchema } from "@aws-amplify/backend";
+
+const schema = a.schema({
+  User: a
+    .model({
+      email: a.string().required(),
+      passwordHash: a.string().required(),
+      role: a.string().required(),
+      createdAt: a.datetime().required(),
+      updatedAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.group("admin")]),
+
+  CustomerProfile: a
+    .model({
+      userId: a.id().required(),
+      accountType: a.string().required(),
+      name: a.string().required(),
+      phone: a.string().required(),
+      country: a.string().required(),
+      addressLine1: a.string().required(),
+      addressLine2: a.string(),
+      city: a.string().required(),
+      region: a.string().required(),
+      postalCode: a.string().required(),
+      addressCountry: a.string().required(),
+      businessName: a.string(),
+      tourOperatorName: a.string(),
+      website: a.string(),
+      taxIdVatNumber: a.string(),
+      createdAt: a.datetime().required(),
+      updatedAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.group("admin")]),
+
+  Quote: a
+    .model({
+      customerId: a.id(),
+      guestEmail: a.string(),
+      guestName: a.string(),
+      guestPhone: a.string(),
+      accountType: a.string().required(),
+      serviceType: a.string().required(),
+      pickupLocation: a.string().required(),
+      dropoffLocation: a.string().required(),
+      pickupDate: a.string().required(),
+      pickupTime: a.string().required(),
+      passengers: a.integer().required(),
+      luggage: a.string(),
+      golfBags: a.integer(),
+      returnJourney: a.boolean().required(),
+      itineraryMessage: a.string(),
+      adminNotes: a.string(),
+      quotedPrice: a.float(),
+      quotedCurrency: a.string().required(),
+      status: a.string().required(),
+      createdAt: a.datetime().required(),
+      updatedAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.guest().to(["create"]), allow.group("admin")]),
+
+  Booking: a
+    .model({
+      quoteId: a.id().required(),
+      confirmed: a.boolean().required(),
+      createdAt: a.datetime().required(),
+      updatedAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.group("admin")]),
+
+  QuoteStatusAudit: a
+    .model({
+      quoteId: a.id().required(),
+      changedByRole: a.string().required(),
+      changedByUserId: a.id(),
+      previousStatus: a.string(),
+      newStatus: a.string().required(),
+      note: a.string(),
+      createdAt: a.datetime().required(),
+    })
+    .authorization((allow) => [allow.group("admin")]),
+});
+
+export type Schema = ClientSchema<typeof schema>;
+
+export const data = defineData({ schema });
