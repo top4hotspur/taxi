@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     }
 
     const result = await createQuote({
+      correlationId,
       customerId: session?.role === "customer" ? session.userId : undefined,
       guestEmail: session ? undefined : String(payload.email),
       guestName: session ? undefined : String(payload.name),

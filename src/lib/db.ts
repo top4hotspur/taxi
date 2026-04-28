@@ -93,6 +93,13 @@ export class DbConfigMissingError extends Error {
   }
 }
 
+interface DbWriteContext {
+  correlationId?: string;
+  operation: string;
+  tableEnvVar: string;
+  tableName: string;
+}
+
 function assertDbWriteConfig() {
   const missing: string[] = REQUIRED_DB_ENV_VARS.filter((envName) => !process.env[envName]?.trim());
   const hasEffectiveRegion = Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim());
@@ -101,6 +108,28 @@ function assertDbWriteConfig() {
   }
   if (missing.length > 0) {
     throw new DbConfigMissingError([...missing]);
+  }
+}
+
+async function putWithDiagnostics<T extends object>(item: T, ctx: DbWriteContext) {
+  try {
+    await ddb.send(new PutCommand({ TableName: ctx.tableName, Item: item as Record<string, unknown> }));
+  } catch (error) {
+    const awsError = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "db.write",
+        correlationId: ctx.correlationId || null,
+        operation: ctx.operation,
+        tableEnvVar: ctx.tableEnvVar,
+        tableName: ctx.tableName,
+        awsErrorName: awsError?.name || "UnknownAwsError",
+        awsErrorMessage: awsError?.message || "Unknown AWS SDK error",
+        httpStatusCode: awsError?.$metadata?.httpStatusCode ?? null,
+      })
+    );
+    throw error;
   }
 }
 
@@ -115,27 +144,42 @@ export const db = {
     return result.Item as UserRecord | undefined;
   },
 
-  async createUser(user: Omit<UserRecord, "id" | "createdAt" | "updatedAt">) {
+  async createUser(user: Omit<UserRecord, "id" | "createdAt" | "updatedAt">, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const record: UserRecord = { ...user, id: id(), createdAt: now(), updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_USERS, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createUser",
+      tableEnvVar: "DDB_TABLE_USERS",
+      tableName: TABLE_USERS,
+    });
     return record;
   },
 
-  async createCustomerProfile(profile: Omit<CustomerProfileRecord, "id" | "createdAt" | "updatedAt">) {
+  async createCustomerProfile(profile: Omit<CustomerProfileRecord, "id" | "createdAt" | "updatedAt">, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const record: CustomerProfileRecord = { ...profile, id: id(), createdAt: now(), updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_CUSTOMER_PROFILES, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createCustomerProfile",
+      tableEnvVar: "DDB_TABLE_CUSTOMER_PROFILES",
+      tableName: TABLE_CUSTOMER_PROFILES,
+    });
     return record;
   },
 
-  async createOrUpdateDriverProfile(input: Omit<DriverProfileRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }) {
+  async createOrUpdateDriverProfile(input: Omit<DriverProfileRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const existing = await this.getDriverProfileByUserId(input.userId);
     const record: DriverProfileRecord = existing
       ? { ...existing, ...input, updatedAt: now() }
       : { ...input, id: id(), createdAt: now(), updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_PROFILES, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createOrUpdateDriverProfile",
+      tableEnvVar: "DDB_TABLE_DRIVER_PROFILES",
+      tableName: TABLE_DRIVER_PROFILES,
+    });
     return record;
   },
 
@@ -154,19 +198,29 @@ export const db = {
     return ((result.Items as DriverProfileRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
-  async createDriverDocument(document: Omit<DriverDocumentRecord, "id" | "createdAt" | "updatedAt">) {
+  async createDriverDocument(document: Omit<DriverDocumentRecord, "id" | "createdAt" | "updatedAt">, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const record: DriverDocumentRecord = { ...document, id: id(), createdAt: now(), updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_DOCUMENTS, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createDriverDocument",
+      tableEnvVar: "DDB_TABLE_DRIVER_DOCUMENTS",
+      tableName: TABLE_DRIVER_DOCUMENTS,
+    });
     return record;
   },
 
-  async updateDriverDocument(documentId: string, patch: Partial<DriverDocumentRecord>) {
+  async updateDriverDocument(documentId: string, patch: Partial<DriverDocumentRecord>, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const existing = await this.getDriverDocumentById(documentId);
     if (!existing) return null;
     const record = { ...existing, ...patch, updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_DOCUMENTS, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "updateDriverDocument",
+      tableEnvVar: "DDB_TABLE_DRIVER_DOCUMENTS",
+      tableName: TABLE_DRIVER_DOCUMENTS,
+    });
     return record;
   },
 
@@ -180,10 +234,15 @@ export const db = {
     return ((result.Items as DriverDocumentRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
-  async createDriverReminderLog(log: Omit<DriverReminderLogRecord, "id" | "sentAt">) {
+  async createDriverReminderLog(log: Omit<DriverReminderLogRecord, "id" | "sentAt">, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const record: DriverReminderLogRecord = { ...log, id: id(), sentAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_DRIVER_REMINDER_LOGS, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createDriverReminderLog",
+      tableEnvVar: "DDB_TABLE_DRIVER_REMINDER_LOGS",
+      tableName: TABLE_DRIVER_REMINDER_LOGS,
+    });
     return record;
   },
 
@@ -199,19 +258,29 @@ export const db = {
     return (result.Items?.[0] as DriverReminderLogRecord | undefined) || undefined;
   },
 
-  async createQuote(quote: Omit<QuoteRecord, "id" | "createdAt" | "updatedAt">) {
+  async createQuote(quote: Omit<QuoteRecord, "id" | "createdAt" | "updatedAt">, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const record: QuoteRecord = { ...quote, id: id(), createdAt: now(), updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_QUOTES, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createQuote",
+      tableEnvVar: "DDB_TABLE_QUOTES",
+      tableName: TABLE_QUOTES,
+    });
     return record;
   },
 
-  async updateQuote(quoteId: string, patch: Partial<QuoteRecord>) {
+  async updateQuote(quoteId: string, patch: Partial<QuoteRecord>, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const current = await this.findQuoteById(quoteId);
     if (!current) return null;
     const next = { ...current, ...patch, updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_QUOTES, Item: next }));
+    await putWithDiagnostics(next, {
+      correlationId: options?.correlationId,
+      operation: "updateQuote",
+      tableEnvVar: "DDB_TABLE_QUOTES",
+      tableName: TABLE_QUOTES,
+    });
     return next;
   },
 
@@ -241,16 +310,26 @@ export const db = {
     });
   },
 
-  async upsertBooking(quoteId: string, confirmed: boolean) {
+  async upsertBooking(quoteId: string, confirmed: boolean, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const existing = await this.getBookingForQuote(quoteId);
     if (!existing) {
       const record: BookingRecord = { id: id(), quoteId, confirmed, createdAt: now(), updatedAt: now() };
-      await ddb.send(new PutCommand({ TableName: TABLE_BOOKINGS, Item: record }));
+      await putWithDiagnostics(record, {
+        correlationId: options?.correlationId,
+        operation: "upsertBooking.create",
+        tableEnvVar: "DDB_TABLE_BOOKINGS",
+        tableName: TABLE_BOOKINGS,
+      });
       return record;
     }
     const next = { ...existing, confirmed, updatedAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_BOOKINGS, Item: next }));
+    await putWithDiagnostics(next, {
+      correlationId: options?.correlationId,
+      operation: "upsertBooking.update",
+      tableEnvVar: "DDB_TABLE_BOOKINGS",
+      tableName: TABLE_BOOKINGS,
+    });
     return next;
   },
 
@@ -259,10 +338,15 @@ export const db = {
     return (result.Items?.[0] as BookingRecord | undefined) || undefined;
   },
 
-  async createAudit(audit: Omit<QuoteAuditRecord, "id" | "createdAt">) {
+  async createAudit(audit: Omit<QuoteAuditRecord, "id" | "createdAt">, options?: { correlationId?: string }) {
     assertDbWriteConfig();
     const record: QuoteAuditRecord = { ...audit, id: id(), createdAt: now() };
-    await ddb.send(new PutCommand({ TableName: TABLE_QUOTE_AUDITS, Item: record }));
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createAudit",
+      tableEnvVar: "DDB_TABLE_QUOTE_AUDITS",
+      tableName: TABLE_QUOTE_AUDITS,
+    });
     return record;
   },
 

@@ -17,6 +17,7 @@ import {
 const adminEmail = process.env.ADMIN_EMAIL || "";
 
 export interface CreateQuoteInput {
+  correlationId?: string;
   customerId?: string;
   guestEmail?: string;
   guestName?: string;
@@ -88,7 +89,7 @@ export async function createQuote(input: CreateQuoteInput) {
     itineraryMessage: input.itineraryMessage,
     quotedCurrency: "GBP",
     status: "QUOTE_REQUESTED",
-  });
+  }, { correlationId: input.correlationId });
 
   await db.createAudit({
     quoteId: quote.id,
@@ -97,7 +98,7 @@ export async function createQuote(input: CreateQuoteInput) {
     previousStatus: undefined,
     newStatus: "QUOTE_REQUESTED",
     note: "Quote created",
-  });
+  }, { correlationId: input.correlationId });
 
   const recipient = await resolveQuoteRecipient(quote);
   let requesterEmail: EmailResult = { ok: false, skipped: true, error: "No recipient email" };
