@@ -1,9 +1,10 @@
-﻿import crypto from "node:crypto";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import crypto from "node:crypto";
+import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region }));
+const ddbClient = new DynamoDBClient({ region });
+const ddb = DynamoDBDocumentClient.from(ddbClient);
 
 const TABLE_USERS = process.env.DDB_TABLE_USERS || "NITaxiUsers";
 const TABLE_CUSTOMER_PROFILES = process.env.DDB_TABLE_CUSTOMER_PROFILES || "NITaxiCustomerProfiles";
@@ -100,6 +101,51 @@ interface DbWriteContext {
   tableName: string;
 }
 
+
+interface TableKeySchemaInfo {
+  partitionKeyName: string;
+  sortKeyName?: string;
+}
+
+const tableKeySchemaCache = new Map<string, TableKeySchemaInfo>();
+
+
+
+async function getTableKeySchema(tableName: string): Promise<TableKeySchemaInfo> {
+  const cached = tableKeySchemaCache.get(tableName);
+  if (cached) return cached;
+
+  const result = await ddbClient.send(new DescribeTableCommand({ TableName: tableName }));
+  const keySchema = result.Table?.KeySchema || [];
+  const partition = keySchema.find((key) => key.KeyType === "HASH")?.AttributeName;
+  if (!partition) {
+    throw new Error(`Unable to resolve partition key for table: ${tableName}`);
+  }
+  const sort = keySchema.find((key) => key.KeyType === "RANGE")?.AttributeName;
+  const schema: TableKeySchemaInfo = { partitionKeyName: partition, sortKeyName: sort };
+  tableKeySchemaCache.set(tableName, schema);
+  return schema;
+}
+
+async function applyTableKeySchema(item: Record<string, unknown>, ctx: DbWriteContext): Promise<Record<string, unknown>> {
+  const schema = await getTableKeySchema(ctx.tableName);
+  const next = { ...item };
+  const idValue = typeof next.id === "string" ? next.id : crypto.randomUUID();
+
+  if (next[schema.partitionKeyName] === undefined || next[schema.partitionKeyName] === null || next[schema.partitionKeyName] === "") {
+    next[schema.partitionKeyName] = idValue;
+  }
+
+  if (schema.sortKeyName) {
+    const existingSortValue = next[schema.sortKeyName];
+    if (existingSortValue === undefined || existingSortValue === null || existingSortValue === "") {
+      next[schema.sortKeyName] = `${ctx.operation}#${idValue}`;
+    }
+  }
+
+  return next;
+}
+
 function assertDbWriteConfig() {
   const missing: string[] = REQUIRED_DB_ENV_VARS.filter((envName) => !process.env[envName]?.trim());
   const hasEffectiveRegion = Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim());
@@ -113,7 +159,8 @@ function assertDbWriteConfig() {
 
 async function putWithDiagnostics<T extends object>(item: T, ctx: DbWriteContext) {
   try {
-    await ddb.send(new PutCommand({ TableName: ctx.tableName, Item: item as Record<string, unknown> }));
+    const itemWithKeys = await applyTableKeySchema(item as Record<string, unknown>, ctx);
+    await ddb.send(new PutCommand({ TableName: ctx.tableName, Item: itemWithKeys }));
   } catch (error) {
     const awsError = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
     console.error(
@@ -285,8 +332,24 @@ export const db = {
   },
 
   async findQuoteById(quoteId: string) {
-    const result = await ddb.send(new GetCommand({ TableName: TABLE_QUOTES, Key: { id: quoteId } }));
-    return result.Item as QuoteRecord | undefined;
+    try {
+      const schema = await getTableKeySchema(TABLE_QUOTES);
+      if (schema.partitionKeyName === "id" && !schema.sortKeyName) {
+        const result = await ddb.send(new GetCommand({ TableName: TABLE_QUOTES, Key: { id: quoteId } }));
+        return result.Item as QuoteRecord | undefined;
+      }
+    } catch {
+      // Fallback to scan path below when key schema lookup/get path is not compatible.
+    }
+
+    const fallback = await ddb.send(new ScanCommand({
+      TableName: TABLE_QUOTES,
+      FilterExpression: "#id = :id",
+      ExpressionAttributeNames: { "#id": "id" },
+      ExpressionAttributeValues: { ":id": quoteId },
+      Limit: 1,
+    }));
+    return (fallback.Items?.[0] as QuoteRecord | undefined) || undefined;
   },
 
   async findQuotesByCustomer(userId: string) {
@@ -353,6 +416,49 @@ export const db = {
   async getAuditsByQuote(quoteId: string) {
     const result = await ddb.send(new ScanCommand({ TableName: TABLE_QUOTE_AUDITS, FilterExpression: "quoteId = :quoteId", ExpressionAttributeValues: { ":quoteId": quoteId } }));
     return ((result.Items as QuoteAuditRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+
+  async testQuoteTableWrite(options?: { correlationId?: string }) {
+    assertDbWriteConfig();
+    const probeId = `health-${id()}`;
+    const probeRecord: QuoteRecord = {
+      id: probeId,
+      accountType: "PERSONAL",
+      serviceType: "HEALTH_CHECK",
+      pickupLocation: "Health Check Pickup",
+      dropoffLocation: "Health Check Dropoff",
+      pickupDate: "2099-01-01",
+      pickupTime: "00:00",
+      passengers: 1,
+      returnJourney: false,
+      quotedCurrency: "GBP",
+      status: "QUOTE_REQUESTED",
+      createdAt: now(),
+      updatedAt: now(),
+      itineraryMessage: "Temporary admin health write-test record.",
+      guestEmail: "healthcheck@example.com",
+      guestName: "Health Check",
+      guestPhone: "N/A",
+      golfBags: 0,
+      luggage: "",
+    };
+
+    await putWithDiagnostics(probeRecord, {
+      correlationId: options?.correlationId,
+      operation: "health.dbWriteTest.createQuote",
+      tableEnvVar: "DDB_TABLE_QUOTES",
+      tableName: TABLE_QUOTES,
+    });
+
+    const keySchema = await getTableKeySchema(TABLE_QUOTES);
+    return {
+      ok: true,
+      tableName: TABLE_QUOTES,
+      tableEnvVar: "DDB_TABLE_QUOTES",
+      keySchema,
+      probeId,
+    };
   },
 
   async listCustomers() {
