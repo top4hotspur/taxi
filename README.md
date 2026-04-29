@@ -108,16 +108,27 @@ Temporary implementation:
 ### 6) Google Maps Places Autocomplete setup
 1. Create a Google Cloud project.
 2. Enable `Maps JavaScript API`.
-3. Enable `Places API`.
+3. Enable `Places API` (and `Places API (New)` if your project uses new Places quotas/features).
 4. Create a browser API key.
-5. Restrict key by HTTP referrer:
+5. Ensure billing is enabled in Google Cloud.
+6. Restrict key by HTTP referrer:
    - `https://www.nitaxico.com/*`
-   - `https://*.amplifyapp.com/*`
+   - `https://nitaxico.com/*`
+   - `https://main.d2pzev9psl5h1s.amplifyapp.com/*`
    - `http://localhost:3000/*`
-6. Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to Amplify environment variables.
-7. Redeploy.
+7. Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to Amplify environment variables.
+8. Redeploy.
 
 If the key is missing or the script fails to load, quote form location fields automatically fall back to manual text input.
+
+Google Places diagnostics:
+- If the UI shows address search unavailable, open browser console and check `[place-autocomplete-diagnostics]` entries.
+- In development mode, field-level diagnostics appear below the input.
+- Common causes:
+  - key missing
+  - referrer restriction mismatch
+  - Places API disabled
+  - billing/project configuration issues
 
 ### 7) Quote troubleshooting commands
 Use these to diagnose live submission issues:
@@ -138,6 +149,12 @@ curl -i -X POST https://<your-amplify-temp-domain>.amplifyapp.com/api/quote \
 nslookup www.nitaxico.com 8.8.8.8
 nslookup www.nitaxico.com
 ```
+
+CloudWatch correlation troubleshooting:
+1. Copy `correlationId` from API error response.
+2. In CloudWatch Logs, open the Amplify SSR function log group for your environment.
+3. Search for the correlation id string to locate the exact DynamoDB write diagnostic record.
+4. Review logged fields: operation, table env var name, table name, AWS error name/message, and HTTP status code.
 
 ## Scope guardrails
 - Driver onboarding: not included.

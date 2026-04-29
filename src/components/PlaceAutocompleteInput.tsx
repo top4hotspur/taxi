@@ -26,10 +26,37 @@ declare global {
         };
       };
     };
+    gm_authFailure?: () => void;
   }
 }
 
 const SCRIPT_ID = "google-maps-places-script";
+const COMPONENT_NAME = "PlaceAutocompleteInput";
+
+type DiagnosticReason =
+  | "API_KEY_MISSING"
+  | "SCRIPT_LOAD_FAILED"
+  | "PLACES_UNAVAILABLE"
+  | "AUTH_OR_REFERRER_ERROR"
+  | "PROJECT_OR_BILLING_ERROR"
+  | null;
+
+function diagnosticMessage(reason: DiagnosticReason): string {
+  switch (reason) {
+    case "API_KEY_MISSING":
+      return "Google Maps key is missing.";
+    case "SCRIPT_LOAD_FAILED":
+      return "Google Maps script failed to load.";
+    case "PLACES_UNAVAILABLE":
+      return "Google Places library is unavailable.";
+    case "AUTH_OR_REFERRER_ERROR":
+      return "Google Maps auth/referrer restriction issue detected.";
+    case "PROJECT_OR_BILLING_ERROR":
+      return "Google Cloud project, billing, or API enablement issue detected.";
+    default:
+      return "";
+  }
+}
 
 function loadGooglePlacesScript(apiKey: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -41,7 +68,7 @@ function loadGooglePlacesScript(apiKey: string): Promise<void> {
     const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Failed to load Google Maps script")), { once: true });
+      existing.addEventListener("error", () => reject(new Error("SCRIPT_LOAD_FAILED")), { once: true });
       return;
     }
 
@@ -51,7 +78,7 @@ function loadGooglePlacesScript(apiKey: string): Promise<void> {
     script.defer = true;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
     script.addEventListener("load", () => resolve(), { once: true });
-    script.addEventListener("error", () => reject(new Error("Failed to load Google Maps script")), { once: true });
+    script.addEventListener("error", () => reject(new Error("SCRIPT_LOAD_FAILED")), { once: true });
     document.head.appendChild(script);
   });
 }
@@ -70,18 +97,78 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputId = useId();
   const [scriptReady, setScriptReady] = useState(false);
-  const [scriptFailed, setScriptFailed] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState("");
   const [selectedAddress, setSelectedAddress] = useState("");
   const [selectedLat, setSelectedLat] = useState("");
   const [selectedLng, setSelectedLng] = useState("");
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const [diagReason, setDiagReason] = useState<DiagnosticReason>(apiKey ? null : "API_KEY_MISSING");
+  const [diagDetail, setDiagDetail] = useState<string | null>(apiKey ? null : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is missing.");
+  const isDebugMode = process.env.NODE_ENV !== "production";
+
+  useEffect(() => {
+    const onWindowError = (event: ErrorEvent) => {
+      if (!event.message) return;
+      const lower = event.message.toLowerCase();
+      if (lower.includes("google maps") || lower.includes("referernotallowedmaperror") || lower.includes("apikey") || lower.includes("billingnotenabledmaperror")) {
+        let reason: DiagnosticReason = "PROJECT_OR_BILLING_ERROR";
+        if (lower.includes("referernotallowedmaperror") || lower.includes("invalidkeymaperror") || lower.includes("apikey")) {
+          reason = "AUTH_OR_REFERRER_ERROR";
+        }
+        setDiagReason(reason);
+        setDiagDetail(event.message);
+      }
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reasonText = String(event.reason ?? "");
+      const lower = reasonText.toLowerCase();
+      if (lower.includes("google") || lower.includes("maps") || lower.includes("places")) {
+        setDiagReason("PROJECT_OR_BILLING_ERROR");
+        setDiagDetail(reasonText);
+      }
+    };
+
+    window.gm_authFailure = () => {
+      setDiagReason("AUTH_OR_REFERRER_ERROR");
+      setDiagDetail("gm_authFailure triggered by Google Maps.");
+    };
+
+    window.addEventListener("error", onWindowError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("error", onWindowError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      delete window.gm_authFailure;
+    };
+  }, []);
 
   useEffect(() => {
     if (!apiKey) return;
+
     loadGooglePlacesScript(apiKey)
-      .then(() => setScriptReady(true))
-      .catch(() => setScriptFailed(true));
+      .then(() => {
+        if (!window.google?.maps) {
+          setDiagReason("SCRIPT_LOAD_FAILED");
+          setDiagDetail("Google Maps object missing after script load.");
+          return;
+        }
+
+        if (!window.google.maps.places?.Autocomplete) {
+          setDiagReason("PLACES_UNAVAILABLE");
+          setDiagDetail("Places library unavailable after script load.");
+          return;
+        }
+
+        setScriptReady(true);
+        setDiagReason(null);
+        setDiagDetail(null);
+      })
+      .catch((error) => {
+        setDiagReason("SCRIPT_LOAD_FAILED");
+        setDiagDetail(error instanceof Error ? error.message : "Unknown script load error");
+      });
   }, [apiKey]);
 
   useEffect(() => {
@@ -109,7 +196,24 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
     });
   }, [scriptReady]);
 
-  const showFallback = !apiKey || scriptFailed;
+  useEffect(() => {
+    const hasGoogle = Boolean(window.google?.maps);
+    const hasPlaces = Boolean(window.google?.maps?.places?.Autocomplete);
+    const message = diagDetail || diagnosticMessage(diagReason);
+
+    console.warn("[place-autocomplete-diagnostics]", {
+      component: COMPONENT_NAME,
+      fieldName: props.locationNameField,
+      scriptLoaded: scriptReady,
+      hasGoogle,
+      hasPlaces,
+      diagnosticReason: diagReason,
+      error: message || null,
+    });
+  }, [diagDetail, diagReason, props.locationNameField, scriptReady]);
+
+  const showFallback = !scriptReady;
+  const fallbackReason = diagDetail || diagnosticMessage(diagReason);
 
   return (
     <div>
@@ -128,7 +232,12 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
       <input type="hidden" name={props.addressField} value={selectedAddress} />
       <input type="hidden" name={props.latField} value={selectedLat} />
       <input type="hidden" name={props.lngField} value={selectedLng} />
-      {showFallback && <p className="mt-1 text-xs text-slate-600">Autocomplete unavailable. Manual entry is enabled.</p>}
+      {showFallback && (
+        <p className="mt-1 text-xs text-slate-600">Address search unavailable - manual entry is still supported.</p>
+      )}
+      {showFallback && isDebugMode && fallbackReason && (
+        <p className="mt-1 text-xs text-slate-500">Diagnostics: {fallbackReason}</p>
+      )}
     </div>
   );
 }

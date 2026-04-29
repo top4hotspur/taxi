@@ -1,4 +1,3 @@
-﻿import Link from "next/link";
 import type { Metadata } from "next";
 import CTASection from "@/components/CTASection";
 import Hero from "@/components/Hero";
@@ -20,20 +19,6 @@ export default function Home() {
         primaryCta={{ label: "Request a Quote", href: "/quote" }}
         secondaryCta={{ label: "Airport Transfers", href: "/airport-transfers" }}
       />
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/quote" className="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-            Request a Quote
-          </Link>
-          <Link href="/customer/login" className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100">
-            Customer Login
-          </Link>
-          <Link href="/driver/login" className="rounded-full border border-slate-200 px-5 py-2 text-sm text-slate-600 hover:bg-slate-50">
-            Driver Login
-          </Link>
-        </div>
-      </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
