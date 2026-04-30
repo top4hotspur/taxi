@@ -53,6 +53,8 @@ export async function GET() {
     sessionRole: user.role,
     appAwsRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim()),
     effectiveRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim()),
+    appAwsAccessKeyIdPresent: Boolean(process.env.APP_AWS_ACCESS_KEY_ID?.trim()),
+    appAwsSecretAccessKeyPresent: Boolean(process.env.APP_AWS_SECRET_ACCESS_KEY?.trim()),
     ddbTables,
     ddbTableChecks,
     emailEnvConfigured,

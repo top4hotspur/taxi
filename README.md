@@ -1,4 +1,4 @@
-﻿# NI Taxi Co Platform
+# NI Taxi Co Platform
 
 Phase 3 Next.js + Amplify-ready booking/quote platform with production email delivery and driver compliance reminders.
 
@@ -45,6 +45,8 @@ Set these in Amplify Hosting (and locally for real sending):
 - `SITE_URL=https://www.nitaxico.com`
 - `SESSION_SECRET`
 - `APP_AWS_REGION=eu-west-2`
+- `APP_AWS_ACCESS_KEY_ID`
+- `APP_AWS_SECRET_ACCESS_KEY`
 - `DDB_TABLE_USERS`
 - `DDB_TABLE_CUSTOMER_PROFILES`
 - `DDB_TABLE_QUOTES`
@@ -56,6 +58,10 @@ Set these in Amplify Hosting (and locally for real sending):
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
+
+Temporary SSR/API DynamoDB credentials note:
+- `APP_AWS_ACCESS_KEY_ID` and `APP_AWS_SECRET_ACCESS_KEY` are a temporary server-side unblock for environments where runtime credentials are unavailable.
+- TODO: replace this with IAM role/AppSync/Amplify Data client pattern before long-term production hardening.
 
 ## Production deployment notes
 

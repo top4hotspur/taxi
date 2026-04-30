@@ -3,7 +3,22 @@ import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
-const ddbClient = new DynamoDBClient({ region });
+const appAccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID?.trim();
+const appSecretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY?.trim();
+
+// TEMPORARY PRODUCTION UNBLOCK: explicit server-side AWS credentials for SSR/API runtime.
+// TODO: Replace with IAM role/AppSync/Amplify Data client pattern before long-term production hardening.
+const ddbClient = new DynamoDBClient({
+  region,
+  ...(appAccessKeyId && appSecretAccessKey
+    ? {
+        credentials: {
+          accessKeyId: appAccessKeyId,
+          secretAccessKey: appSecretAccessKey,
+        },
+      }
+    : {}),
+});
 const ddb = DynamoDBDocumentClient.from(ddbClient);
 
 const TABLE_USERS = process.env.DDB_TABLE_USERS || "NITaxiUsers";
