@@ -11,8 +11,17 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   const { id } = await context.params;
   const quote = await db.findQuoteById(id);
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
+  const customer = quote.customerId ? await db.findUserById(quote.customerId) : null;
 
-  return NextResponse.json({ success: true, quote: { ...quote, booking: await db.getBookingForQuote(id), audits: await db.getAuditsByQuote(id) } });
+  return NextResponse.json({
+    success: true,
+    quote: {
+      ...quote,
+      customerEmail: customer?.email || null,
+      booking: await db.getBookingForQuote(id),
+      audits: await db.getAuditsByQuote(id),
+    },
+  });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -46,5 +55,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     await sendStatusLifecycleEmails({ quote: updated, newStatus: nextStatus });
   }
 
-  return NextResponse.json({ success: true, quote: updated });
+  const customer = updated?.customerId ? await db.findUserById(updated.customerId) : null;
+  return NextResponse.json({ success: true, quote: updated ? { ...updated, customerEmail: customer?.email || null } : updated });
 }

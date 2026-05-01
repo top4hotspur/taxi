@@ -15,6 +15,14 @@ export async function POST(request: Request) {
   const user = await db.createUser({ email: body.email.toLowerCase(), passwordHash: hashPassword(body.password), role: "CUSTOMER" });
   await db.createCustomerProfile({ userId: user.id, accountType: body.accountType === "BUSINESS" ? "BUSINESS" : "PERSONAL", name: body.name, phone: body.phone, country: body.country, addressLine1: body.addressLine1, addressLine2: body.addressLine2 || null, city: body.city, region: body.region, postalCode: body.postalCode, addressCountry: body.addressCountry, businessName: body.businessName || null, tourOperatorName: body.tourOperatorName || null, website: body.website || null, taxIdVatNumber: body.taxIdVatNumber || null });
 
+  // Backfill legacy/pre-register guest quotes to this customer account by matching email.
+  const normalizedEmail = user.email.trim().toLowerCase();
+  const existingQuotes = await db.listQuotes();
+  const linkableQuotes = existingQuotes.filter((quote) => !quote.customerId && (quote.guestEmail || "").trim().toLowerCase() === normalizedEmail);
+  for (const quote of linkableQuotes) {
+    await db.updateQuote(quote.id, { customerId: user.id });
+  }
+
   const token = createSessionToken({ userId: user.id, email: user.email, role: "customer" });
   const cookieStore = await cookies();
   cookieStore.set(sessionCookie.name, token, sessionCookie.options);

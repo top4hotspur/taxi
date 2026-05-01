@@ -15,7 +15,10 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   const user = await getCurrentSessionUser();
   if (!user || user.role !== "customer") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
-  const quote = (await db.findQuotesByCustomer(user.userId)).find((q) => q.id === id);
+  const normalizedEmail = user.email.trim().toLowerCase();
+  const quote = (await db.listQuotes()).find(
+    (q) => q.id === id && (q.customerId === user.userId || (q.guestEmail || "").trim().toLowerCase() === normalizedEmail)
+  );
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true, quote: { ...toCustomerQuoteView(quote), booking: await db.getBookingForQuote(id), audits: await db.getAuditsByQuote(id) } });
 }
@@ -26,7 +29,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   const { id } = await context.params;
   const body = (await request.json()) as { action?: "accept" | "decline" };
-  const quote = (await db.findQuotesByCustomer(user.userId)).find((q) => q.id === id);
+  const normalizedEmail = user.email.trim().toLowerCase();
+  const quote = (await db.listQuotes()).find(
+    (q) => q.id === id && (q.customerId === user.userId || (q.guestEmail || "").trim().toLowerCase() === normalizedEmail)
+  );
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
 
   let newStatus: QuoteStatusValue | null = null;

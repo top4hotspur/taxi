@@ -13,6 +13,7 @@ type Quote = {
   accountType: string;
   guestName?: string;
   guestEmail?: string;
+  customerEmail?: string | null;
   guestPhone?: string;
   pickupLocation: string;
   pickupPlaceId?: string;
@@ -109,7 +110,7 @@ export default function AdminQuoteDetailPage() {
         <p>Status: <strong>{quote.status}</strong></p>
         <p>Account type: {quote.accountType}</p>
         <p>Name: {quote.guestName || "Account customer"}</p>
-        <p>Email: {quote.guestEmail || "From customer account"}</p>
+        <p>Email: {quote.guestEmail || quote.customerEmail || "From customer account"}</p>
         <p>Phone: {quote.guestPhone || "Not provided"}</p>
         <p>Service: {quote.serviceType}</p>
         <p>Date/Time: {quote.pickupDate} {quote.pickupTime}</p>
