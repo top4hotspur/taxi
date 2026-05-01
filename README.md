@@ -58,6 +58,8 @@ Set these in Amplify Hosting (and locally for real sending):
 - `DDB_TABLE_PRICING_SETTINGS`
 - `DDB_TABLE_PRICING_TIME_UPLIFTS`
 - `DDB_TABLE_PRICING_DATE_UPLIFTS`
+- `DDB_TABLE_ANALYTICS_EVENTS=ni-taxi-analytics-events`
+- `ANALYTICS_SALT` (optional, recommended for IP hashing)
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 - `GOOGLE_ROUTES_API_KEY`
 
@@ -179,6 +181,20 @@ CloudWatch correlation troubleshooting:
 2. In CloudWatch Logs, open the Amplify SSR function log group for your environment.
 3. Search for the correlation id string to locate the exact DynamoDB write diagnostic record.
 4. Review logged fields: operation, table env var name, table name, AWS error name/message, and HTTP status code.
+
+## First-party analytics notes
+- Events are captured via `POST /api/analytics/event`.
+- Raw IP addresses are not stored; an `ipHash` is stored using `ANALYTICS_SALT` (or `SESSION_SECRET` fallback).
+- Admin analytics dashboard is available at `/admin/analytics`.
+- Current funnel events:
+  - `PAGE_VIEW`
+  - `QUOTE_STARTED`
+  - `QUOTE_ESTIMATE_CALCULATED`
+  - `QUOTE_SUBMITTED`
+  - `CUSTOMER_REGISTER_STARTED`
+  - `CUSTOMER_REGISTERED`
+  - `DRIVER_REGISTER_STARTED`
+  - `DRIVER_REGISTERED`
 
 ## Scope guardrails
 - Driver onboarding: not included.

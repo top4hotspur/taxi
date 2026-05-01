@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 
 const countryOptions = [
   "United Kingdom",
@@ -32,6 +33,7 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [accountType, setAccountType] = useState<"PERSONAL" | "BUSINESS">("PERSONAL");
+  const [startTracked, setStartTracked] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,12 +57,20 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
     }
 
     if (mode === "driver") {
+      trackAnalyticsEvent("DRIVER_REGISTERED", "/driver/register");
       setMessage("Driver profile saved. Please continue with Driver Login and upload documents.");
       event.currentTarget.reset();
       return;
     }
 
+    trackAnalyticsEvent("CUSTOMER_REGISTERED", "/customer/register");
     window.location.href = "/account";
+  }
+
+  function trackStart() {
+    if (startTracked) return;
+    setStartTracked(true);
+    trackAnalyticsEvent(mode === "driver" ? "DRIVER_REGISTER_STARTED" : "CUSTOMER_REGISTER_STARTED", mode === "driver" ? "/driver/register" : "/customer/register");
   }
 
   if (mode === "driver") {
@@ -68,7 +78,7 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
       <section className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6">
         <h1 className="text-3xl font-bold">Driver Register</h1>
         <p className="mt-2 text-slate-700">Complete your driver profile. Document upload and review continues in the driver portal.</p>
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} onFocusCapture={trackStart} className="mt-6 grid gap-4 sm:grid-cols-2">
           <Input label="Name" name="name" required />
           <Input label="Email" name="email" type="email" required />
           <Input label="Password" name="password" type="password" required />
@@ -97,7 +107,7 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
   return (
     <section className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6">
       <h1 className="text-3xl font-bold">Create Customer Account</h1>
-      <form onSubmit={handleSubmit} className="mt-6 grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} onFocusCapture={trackStart} className="mt-6 grid gap-4 sm:grid-cols-2">
         <Input label="Email" name="email" type="email" required />
         <Input label="Password" name="password" type="password" required />
         <Select

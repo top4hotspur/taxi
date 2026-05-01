@@ -118,6 +118,7 @@ export default function AdminPage() {
         <Link href="/admin/customers" className="underline">View Customers</Link>
         <Link href="/admin/drivers" className="underline">Manage Drivers</Link>
         <Link href="/admin/pricing" className="underline">Pricing Rules</Link>
+        <Link href="/admin/analytics" className="underline">Analytics</Link>
       </div>
     </section>
   );

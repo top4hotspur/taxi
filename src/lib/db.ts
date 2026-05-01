@@ -36,6 +36,7 @@ const TABLE_DRIVER_REMINDER_LOGS = process.env.DDB_TABLE_DRIVER_REMINDER_LOGS ||
 const TABLE_PRICING_SETTINGS = process.env.DDB_TABLE_PRICING_SETTINGS || "NITaxiPricingSettings";
 const TABLE_PRICING_TIME_UPLIFTS = process.env.DDB_TABLE_PRICING_TIME_UPLIFTS || "NITaxiPricingTimeUplifts";
 const TABLE_PRICING_DATE_UPLIFTS = process.env.DDB_TABLE_PRICING_DATE_UPLIFTS || "NITaxiPricingDateUplifts";
+const TABLE_ANALYTICS_EVENTS = process.env.DDB_TABLE_ANALYTICS_EVENTS || "ni-taxi-analytics-events";
 
 const REQUIRED_DB_ENV_VARS = [
   "DDB_TABLE_USERS",
@@ -144,6 +145,31 @@ export interface PricingDateUpliftRecord {
   endDate?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AnalyticsEventRecord {
+  eventId: string;
+  eventType:
+    | "PAGE_VIEW"
+    | "QUOTE_STARTED"
+    | "QUOTE_ESTIMATE_CALCULATED"
+    | "QUOTE_SUBMITTED"
+    | "CUSTOMER_REGISTER_STARTED"
+    | "CUSTOMER_REGISTERED"
+    | "DRIVER_REGISTER_STARTED"
+    | "DRIVER_REGISTERED";
+  path: string;
+  referrer?: string;
+  landingPage?: string;
+  sessionId: string;
+  anonymousVisitorId: string;
+  userId?: string;
+  customerEmail?: string;
+  userAgent?: string;
+  ipHash?: string;
+  country?: string;
+  region?: string;
+  createdAt: string;
 }
 
 function now() { return new Date().toISOString(); }
@@ -667,6 +693,29 @@ export const db = {
     }
 
     return records;
+  },
+
+  async createAnalyticsEvent(event: Omit<AnalyticsEventRecord, "eventId" | "createdAt"> & { eventId?: string }, options?: { correlationId?: string }) {
+    if (!process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()) {
+      throw new DbConfigMissingError(["DDB_TABLE_ANALYTICS_EVENTS"]);
+    }
+    const record: AnalyticsEventRecord = {
+      ...event,
+      eventId: event.eventId || id(),
+      createdAt: now(),
+    };
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createAnalyticsEvent",
+      tableEnvVar: "DDB_TABLE_ANALYTICS_EVENTS",
+      tableName: TABLE_ANALYTICS_EVENTS,
+    });
+    return record;
+  },
+
+  async listAnalyticsEvents() {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_ANALYTICS_EVENTS }));
+    return ((result.Items as AnalyticsEventRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
   async listCustomers() {

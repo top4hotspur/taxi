@@ -15,6 +15,7 @@ const dbEnvVars = [
   "DDB_TABLE_PRICING_SETTINGS",
   "DDB_TABLE_PRICING_TIME_UPLIFTS",
   "DDB_TABLE_PRICING_DATE_UPLIFTS",
+  "DDB_TABLE_ANALYTICS_EVENTS",
 ] as const;
 
 export async function GET() {

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import PlaceAutocompleteInput from "@/components/PlaceAutocompleteInput";
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 
 const serviceTypes = [
   "Airport transfer",
@@ -73,6 +74,10 @@ export default function QuoteForm() {
     };
   }, []);
 
+  useEffect(() => {
+    trackAnalyticsEvent("QUOTE_STARTED", "/quote");
+  }, []);
+
   async function calculateEstimate() {
     if (!formRef.current) return;
     setEstimating(true);
@@ -116,6 +121,9 @@ export default function QuoteForm() {
         return;
       }
       setEstimate(result);
+      if (result.ok) {
+        trackAnalyticsEvent("QUOTE_ESTIMATE_CALCULATED", "/quote");
+      }
       if (result.routeEstimateFailed) {
         setEstimateError(result.customerMessage || "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.");
       }
@@ -198,6 +206,7 @@ export default function QuoteForm() {
 
       setStatus("success");
       setMessage(result.message || "Quote submitted.");
+      trackAnalyticsEvent("QUOTE_SUBMITTED", "/quote");
       form.reset();
       setEstimate(null);
       router.push("/quote/confirmation");
