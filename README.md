@@ -56,6 +56,7 @@ Set these in Amplify Hosting (and locally for real sending):
 - `DDB_TABLE_DRIVER_DOCUMENTS`
 - `DDB_TABLE_DRIVER_REMINDER_LOGS`
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- `GOOGLE_ROUTES_API_KEY`
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
 
@@ -127,6 +128,13 @@ Temporary implementation:
 8. Redeploy.
 
 If the key is missing or the script fails to load, quote form location fields automatically fall back to manual text input.
+
+### 6.1) Instant route-based pricing setup
+1. Enable `Routes API` in Google Cloud.
+2. Create a server-side API key for routes calls.
+3. Restrict the key as tightly as possible (server/runtime usage only where supported).
+4. Add `GOOGLE_ROUTES_API_KEY` to Amplify environment variables.
+5. Redeploy so Amplify writes runtime vars into `.env.production`.
 
 Google Places diagnostics:
 - If the UI shows address search unavailable, open browser console and check `[place-autocomplete-diagnostics]` entries.

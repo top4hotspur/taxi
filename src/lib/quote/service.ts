@@ -41,6 +41,14 @@ export interface CreateQuoteInput {
   golfBags?: number;
   returnJourney: boolean;
   itineraryMessage?: string;
+  estimatedFare?: number;
+  estimatedCurrency?: string;
+  estimatedDistanceMiles?: number;
+  estimatedDurationMinutes?: number;
+  estimatedFareBreakdown?: string;
+  pricingSource?: string;
+  requiresManualReview?: boolean;
+  pricingCalculatedAt?: string;
 }
 
 export interface QuoteNotificationOutcome {
@@ -87,6 +95,14 @@ export async function createQuote(input: CreateQuoteInput) {
     golfBags: input.golfBags ?? 0,
     returnJourney: input.returnJourney,
     itineraryMessage: input.itineraryMessage,
+    estimatedFare: input.estimatedFare,
+    estimatedCurrency: input.estimatedCurrency,
+    estimatedDistanceMiles: input.estimatedDistanceMiles,
+    estimatedDurationMinutes: input.estimatedDurationMinutes,
+    estimatedFareBreakdown: input.estimatedFareBreakdown,
+    pricingSource: input.pricingSource,
+    requiresManualReview: input.requiresManualReview,
+    pricingCalculatedAt: input.pricingCalculatedAt,
     quotedCurrency: "GBP",
     status: "QUOTE_REQUESTED",
   }, { correlationId: input.correlationId });

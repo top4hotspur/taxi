@@ -31,6 +31,14 @@ type Quote = {
   golfBags?: number;
   returnJourney: boolean;
   itineraryMessage?: string;
+  estimatedFare?: number;
+  estimatedCurrency?: string;
+  estimatedDistanceMiles?: number;
+  estimatedDurationMinutes?: number;
+  estimatedFareBreakdown?: string;
+  pricingSource?: string;
+  requiresManualReview?: boolean;
+  pricingCalculatedAt?: string;
   audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>;
 };
 
@@ -110,6 +118,14 @@ export default function AdminQuoteDetailPage() {
         <p>Drop-off address: {quote.dropoffAddress || "Not provided"}</p>
         <p>Drop-off place ID: {quote.dropoffPlaceId || "Not provided"}</p>
         <p>Drop-off coordinates: {quote.dropoffLat !== undefined && quote.dropoffLng !== undefined ? `${quote.dropoffLat}, ${quote.dropoffLng}` : "Not provided"}</p>
+        <hr className="my-3 border-slate-200" />
+        <p>Pricing source: {quote.pricingSource || "None"}</p>
+        <p>Estimated fare: {quote.estimatedFare !== undefined ? `${quote.estimatedFare} ${quote.estimatedCurrency || "GBP"}` : "Not available"}</p>
+        <p>Estimated distance: {quote.estimatedDistanceMiles !== undefined ? `${quote.estimatedDistanceMiles} miles` : "Not available"}</p>
+        <p>Estimated duration: {quote.estimatedDurationMinutes !== undefined ? `${quote.estimatedDurationMinutes} minutes` : "Not available"}</p>
+        <p>Requires manual review: {quote.requiresManualReview ? "Yes" : "No"}</p>
+        <p>Pricing calculated at: {quote.pricingCalculatedAt || "Not available"}</p>
+        <p>Fare breakdown: {quote.estimatedFareBreakdown || "Not available"}</p>
       </div>
 
       <form onSubmit={update} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">

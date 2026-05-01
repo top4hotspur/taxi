@@ -50,6 +50,9 @@ export async function POST(request: Request) {
     const pickupLng = Number(payload.pickupLng);
     const dropoffLat = Number(payload.dropoffLat);
     const dropoffLng = Number(payload.dropoffLng);
+    const estimatedFare = Number(payload.estimatedFare);
+    const estimatedDistanceMiles = Number(payload.estimatedDistanceMiles);
+    const estimatedDurationMinutes = Number(payload.estimatedDurationMinutes);
 
     if (!Number.isFinite(passengers) || passengers < 1) {
       return NextResponse.json(
@@ -91,6 +94,14 @@ export async function POST(request: Request) {
       golfBags: Number.isFinite(golfBags) ? golfBags : 0,
       returnJourney: String(payload.returnJourney || "no").toLowerCase() === "yes",
       itineraryMessage: String(payload.itineraryMessage || ""),
+      estimatedFare: Number.isFinite(estimatedFare) ? estimatedFare : undefined,
+      estimatedCurrency: String(payload.estimatedCurrency || "") || undefined,
+      estimatedDistanceMiles: Number.isFinite(estimatedDistanceMiles) ? estimatedDistanceMiles : undefined,
+      estimatedDurationMinutes: Number.isFinite(estimatedDurationMinutes) ? estimatedDurationMinutes : undefined,
+      estimatedFareBreakdown: String(payload.estimatedFareBreakdown || "") || undefined,
+      pricingSource: String(payload.pricingSource || "") || undefined,
+      requiresManualReview: String(payload.requiresManualReview || "").toLowerCase() === "true",
+      pricingCalculatedAt: String(payload.pricingCalculatedAt || "") || undefined,
     });
 
     quoteSaved = true;
