@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import Image from "next/image";
+import Link from "next/link";
 import { navLinks, siteConfig } from "@/lib/siteContent";
 
 export default function Footer() {
@@ -6,10 +7,22 @@ export default function Footer() {
     <footer className="mt-16 border-t border-slate-200 bg-white">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{siteConfig.name}</h2>
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 p-1.5">
+              <Image
+                src={siteConfig.logoPath}
+                alt={`${siteConfig.name} logo`}
+                width={40}
+                height={40}
+                className="h-10 w-10 object-contain"
+              />
+            </span>
+            <h2 className="text-lg font-semibold text-slate-900">{siteConfig.name}</h2>
+          </div>
           <p className="mt-3 text-sm text-slate-600">Northern Ireland private hire / taxi booking enquiries</p>
           <p className="mt-3 text-sm text-slate-700">Email: {siteConfig.email}</p>
           <p className="mt-1 text-sm text-slate-700">Phone: {siteConfig.phone}</p>
+          <p className="mt-1 text-sm text-slate-700">Registered Company Number: {siteConfig.companyNumber}</p>
         </div>
 
         <div>

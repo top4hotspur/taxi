@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { siteConfig } from "@/lib/siteContent";
 
 const servicesLinks = [
   { label: "Airport Transfers", href: "/airport-transfers" },
@@ -91,8 +93,23 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/50 bg-slate-950/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link href="/" className="text-xl font-semibold tracking-wide text-white" onClick={closeMobileMenu}>
-          NI Taxi Co
+        <Link
+          href="/"
+          className="flex items-center gap-3 text-white"
+          onClick={closeMobileMenu}
+          aria-label={siteConfig.name}
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm">
+            <Image
+              src={siteConfig.logoPath}
+              alt={`${siteConfig.name} logo`}
+              width={32}
+              height={32}
+              className="h-8 w-8 object-contain"
+              priority
+            />
+          </span>
+          <span className="text-lg font-semibold tracking-wide sm:text-xl">{siteConfig.name}</span>
         </Link>
 
         <button

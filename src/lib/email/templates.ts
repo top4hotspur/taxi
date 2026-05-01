@@ -1,4 +1,5 @@
-﻿import { QuoteRecord } from "@/lib/db";
+import { QuoteRecord } from "@/lib/db";
+import { siteConfig } from "@/lib/siteContent";
 
 const siteUrl = process.env.SITE_URL || "https://www.nitaxico.com";
 
@@ -16,6 +17,15 @@ function quoteSummary(quote: QuoteRecord) {
   ].join("\n");
 }
 
+function emailFooter() {
+  return [
+    siteConfig.name,
+    `Phone: ${siteConfig.phone}`,
+    `Email: ${siteConfig.email}`,
+    `Registered Company Number: ${siteConfig.companyNumber}`,
+  ].join("\n");
+}
+
 export function customerQuoteRequestedEmail(params: { quote: QuoteRecord; recipientName?: string; isGuest: boolean }) {
   const intro = params.isGuest
     ? "Thank you for your quote request. We have received your details and will respond shortly."
@@ -26,14 +36,14 @@ export function customerQuoteRequestedEmail(params: { quote: QuoteRecord; recipi
 
   return {
     subject: `Quote request received (${params.quote.id})`,
-    text: `${intro}\n\n${quoteSummary(params.quote)}${guestGuidance}\n\nNI Taxi Co`,
+    text: `${intro}\n\n${quoteSummary(params.quote)}${guestGuidance}\n\n${emailFooter()}`,
   };
 }
 
 export function adminQuoteRequestedEmail(params: { quote: QuoteRecord; requesterEmail?: string }) {
   return {
     subject: `New quote request: ${params.quote.id}`,
-    text: `A new quote request was submitted.${params.requesterEmail ? `\nRequester email: ${params.requesterEmail}` : ""}\n\n${quoteSummary(params.quote)}`,
+    text: `A new quote request was submitted.${params.requesterEmail ? `\nRequester email: ${params.requesterEmail}` : ""}\n\n${quoteSummary(params.quote)}\n\n${emailFooter()}`,
   };
 }
 
@@ -43,7 +53,7 @@ export function customerQuoteUpdatedEmail(quote: QuoteRecord, isGuest: boolean) 
     : `Track your quote: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Your quote was updated (${quote.id})`,
-    text: `Your quote has been updated.\n\n${quoteSummary(quote)}\n\n${trackText}`,
+    text: `Your quote has been updated.\n\n${quoteSummary(quote)}\n\n${trackText}\n\n${emailFooter()}`,
   };
 }
 
@@ -54,7 +64,7 @@ export function customerQuoteSentEmail(quote: QuoteRecord, isGuest: boolean) {
     : `Review and respond here: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Your quote is ready (${quote.id})`,
-    text: `Your quote is ready.\n${priceLine}\n\n${quoteSummary(quote)}\n\n${cta}`,
+    text: `Your quote is ready.\n${priceLine}\n\n${quoteSummary(quote)}\n\n${cta}\n\n${emailFooter()}`,
   };
 }
 
@@ -62,28 +72,28 @@ export function customerQuoteAcceptedEmail(quote: QuoteRecord, isGuest: boolean)
   const track = isGuest ? "We will follow up by email with next steps." : `Track progress: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Quote accepted (${quote.id})`,
-    text: `Thank you for accepting your quote.\n\n${quoteSummary(quote)}\n\n${track}`,
+    text: `Thank you for accepting your quote.\n\n${quoteSummary(quote)}\n\n${track}\n\n${emailFooter()}`,
   };
 }
 
 export function adminQuoteAcceptedEmail(quote: QuoteRecord) {
   return {
     subject: `Quote accepted by customer (${quote.id})`,
-    text: `A customer accepted quote ${quote.id}.\n\n${quoteSummary(quote)}`,
+    text: `A customer accepted quote ${quote.id}.\n\n${quoteSummary(quote)}\n\n${emailFooter()}`,
   };
 }
 
 export function adminQuoteDeclinedEmail(quote: QuoteRecord) {
   return {
     subject: `Quote declined by customer (${quote.id})`,
-    text: `A customer declined quote ${quote.id}.\n\n${quoteSummary(quote)}`,
+    text: `A customer declined quote ${quote.id}.\n\n${quoteSummary(quote)}\n\n${emailFooter()}`,
   };
 }
 
 export function adminBookingCreatedEmail(quote: QuoteRecord) {
   return {
     subject: `Booking created (${quote.id})`,
-    text: `A booking has been created from quote ${quote.id}.\n\n${quoteSummary(quote)}`,
+    text: `A booking has been created from quote ${quote.id}.\n\n${quoteSummary(quote)}\n\n${emailFooter()}`,
   };
 }
 
@@ -91,14 +101,14 @@ export function customerBookingConfirmedEmail(quote: QuoteRecord, isGuest: boole
   const track = isGuest ? "Reply to this email for any changes." : `View booking quote details: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Booking confirmed (${quote.id})`,
-    text: `Your booking is confirmed.\n\nJourney summary:\n${quoteSummary(quote)}\n\nDriver details: To be shared before travel (placeholder).\n\n${track}`,
+    text: `Your booking is confirmed.\n\nJourney summary:\n${quoteSummary(quote)}\n\nDriver details: To be shared before travel (placeholder).\n\n${track}\n\n${emailFooter()}`,
   };
 }
 
 export function adminBookingConfirmedEmail(quote: QuoteRecord) {
   return {
     subject: `Booking confirmed (${quote.id})`,
-    text: `Booking confirmed for quote ${quote.id}.\n\n${quoteSummary(quote)}`,
+    text: `Booking confirmed for quote ${quote.id}.\n\n${quoteSummary(quote)}\n\n${emailFooter()}`,
   };
 }
 
@@ -115,7 +125,7 @@ export function driverMissingComplianceReminderEmail(params: {
     : "Missing documents: None";
   return {
     subject: "Action needed: complete your NI Taxi Co driver onboarding",
-    text: `Hello ${params.driverName},\n\nYour driver onboarding is not complete yet.\n${profileLine}\n${docsLine}\n\nPlease update your profile and documents in the driver portal.\n${siteUrl}/driver/documents`,
+    text: `Hello ${params.driverName},\n\nYour driver onboarding is not complete yet.\n${profileLine}\n${docsLine}\n\nPlease update your profile and documents in the driver portal.\n${siteUrl}/driver/documents\n\n${emailFooter()}`,
   };
 }
 
@@ -127,7 +137,7 @@ export function driverDocumentExpiryWarningEmail(params: {
 }) {
   return {
     subject: `${params.documentType} expires in ${params.weeksBefore} weeks`,
-    text: `Hello ${params.driverName},\n\nYour ${params.documentType} is due to expire on ${params.expiryDate}.\nPlease upload an updated document before expiry to avoid interruptions.\n\nDriver portal: ${siteUrl}/driver/documents`,
+    text: `Hello ${params.driverName},\n\nYour ${params.documentType} is due to expire on ${params.expiryDate}.\nPlease upload an updated document before expiry to avoid interruptions.\n\nDriver portal: ${siteUrl}/driver/documents\n\n${emailFooter()}`,
   };
 }
 
@@ -138,7 +148,7 @@ export function driverDocumentExpiredEmail(params: {
 }) {
   return {
     subject: `Urgent: ${params.documentType} has expired`,
-    text: `Hello ${params.driverName},\n\nYour ${params.documentType} expired on ${params.expiryDate} and is now marked EXPIRED.\nPlease upload a replacement document as soon as possible.\n\nDriver portal: ${siteUrl}/driver/documents`,
+    text: `Hello ${params.driverName},\n\nYour ${params.documentType} expired on ${params.expiryDate} and is now marked EXPIRED.\nPlease upload a replacement document as soon as possible.\n\nDriver portal: ${siteUrl}/driver/documents\n\n${emailFooter()}`,
   };
 }
 
@@ -150,6 +160,6 @@ export function adminDriverComplianceAlertEmail(params: {
 }) {
   return {
     subject: `Driver compliance alert: ${params.alertType} (${params.driverName})`,
-    text: `Driver: ${params.driverName}\nDriver email: ${params.driverEmail}\nAlert type: ${params.alertType}\n\n${params.details}`,
+    text: `Driver: ${params.driverName}\nDriver email: ${params.driverEmail}\nAlert type: ${params.alertType}\n\n${params.details}\n\n${emailFooter()}`,
   };
 }

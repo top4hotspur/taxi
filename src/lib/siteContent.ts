@@ -2,7 +2,10 @@
   name: "NI Taxi Co",
   url: "https://www.nitaxico.com",
   email: "contact@nitaxico.com",
-  phone: "+44 7917 221111",
+  phone: "07440368474",
+  phoneInternational: "+44 7440 368474",
+  companyNumber: "NI721173",
+  logoPath: "/images/ni-taxi-logo.png",
   description:
     "Private taxi and tour transfers across Northern Ireland for tourists, golfers, airport passengers, and tour operators.",
 };
@@ -22,6 +25,7 @@ export const trustPoints = [
   "Tourist day tours",
   "Pre-booked private hire",
   "Tour operator friendly",
+  "Registered Company Number: NI721173",
 ];
 
 export const featuredServices = [
