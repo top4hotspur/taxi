@@ -73,47 +73,62 @@ export default function Header() {
             <Link href="/quote" className={`text-sm font-medium transition ${isActive(pathname, "/quote") ? "text-amber-300" : "text-slate-200 hover:text-white"}`}>
               Request a Quote
             </Link>
-            <div className="group relative">
-              <button type="button" className={`text-sm font-medium transition ${hasServicesActive(pathname) ? "text-amber-300" : "text-slate-200 group-hover:text-white"}`}>
+            <div className="relative group">
+              <button type="button" className={`text-sm font-medium transition ${hasServicesActive(pathname) ? "text-amber-300" : "text-slate-200"}`}>
                 Services
               </button>
-              <div className="invisible absolute left-0 top-full mt-2 min-w-52 rounded-lg border border-slate-700 bg-slate-950 p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100">
-                {servicesLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+              <div className="absolute top-full h-2 w-full" />
+              <div className="absolute left-0 top-full mt-0 hidden min-w-52 group-hover:block">
+                <div className="pt-2">
+                  <div className="rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-xl">
+                    {servicesLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <div className="ml-4 flex items-center gap-4 border-l border-slate-700/70 pl-4">
-            <div className="group relative">
-              <button type="button" className="text-sm font-medium text-slate-200 transition group-hover:text-white">
+            <div className="relative group">
+              <button type="button" className="text-sm font-medium text-slate-200 transition">
                 Customer
               </button>
-              <div className="invisible absolute right-0 top-full mt-2 min-w-52 rounded-lg border border-slate-700 bg-slate-950 p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100">
-                {customerLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}>
-                    {link.label}
-                  </Link>
-                ))}
+              <div className="absolute top-full h-2 w-full" />
+              <div className="absolute right-0 top-full mt-0 hidden min-w-52 group-hover:block">
+                <div className="pt-2">
+                  <div className="rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-xl">
+                    {customerLinks.map((link) => (
+                      <Link key={link.href} href={link.href} className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}>
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="group relative">
-              <button type="button" className="text-sm font-medium text-slate-200 transition group-hover:text-white">
+            <div className="relative group">
+              <button type="button" className="text-sm font-medium text-slate-200 transition">
                 Driver
               </button>
-              <div className="invisible absolute right-0 top-full mt-2 min-w-52 rounded-lg border border-slate-700 bg-slate-950 p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100">
-                {driverLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}>
-                    {link.label}
-                  </Link>
-                ))}
+              <div className="absolute top-full h-2 w-full" />
+              <div className="absolute right-0 top-full mt-0 hidden min-w-52 group-hover:block">
+                <div className="pt-2">
+                  <div className="rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-xl">
+                    {driverLinks.map((link) => (
+                      <Link key={link.href} href={link.href} className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}>
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             {isAdmin && (
