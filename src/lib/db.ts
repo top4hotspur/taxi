@@ -55,7 +55,7 @@ type Role = "CUSTOMER" | "ADMIN" | "DRIVER";
 
 export interface UserRecord { id: string; email: string; passwordHash: string; role: Role; createdAt: string; updatedAt: string }
 export interface CustomerProfileRecord { id: string; userId: string; accountType: string; name: string; phone: string; country: string; addressLine1: string; addressLine2?: string | null; city: string; region: string; postalCode: string; addressCountry: string; businessName?: string | null; tourOperatorName?: string | null; website?: string | null; taxIdVatNumber?: string | null; createdAt: string; updatedAt: string }
-export interface QuoteRecord { id: string; customerId?: string; guestEmail?: string; guestName?: string; guestPhone?: string; accountType: string; serviceType: string; pickupLocation: string; pickupPlaceId?: string; pickupAddress?: string; pickupLat?: number; pickupLng?: number; dropoffLocation: string; dropoffPlaceId?: string; dropoffAddress?: string; dropoffLat?: number; dropoffLng?: number; pickupDate: string; pickupTime: string; passengers: number; luggage?: string; golfBags?: number; returnJourney: boolean; itineraryMessage?: string; adminNotes?: string; quotedPrice?: number; quotedCurrency: string; estimatedFare?: number; estimatedCurrency?: string; estimatedDistanceMiles?: number; estimatedDurationMinutes?: number; estimatedFareBreakdown?: string; pricingSource?: string; requiresManualReview?: boolean; pricingCalculatedAt?: string; routeEstimateFailed?: boolean; routeEstimateFailureReason?: string; status: string; createdAt: string; updatedAt: string }
+export interface QuoteRecord { id: string; customerId?: string; guestEmail?: string; guestName?: string; guestPhone?: string; passengerName?: string; passengerPhone?: string; accountType: string; serviceType: string; pickupLocation: string; pickupPlaceId?: string; pickupAddress?: string; pickupLat?: number; pickupLng?: number; dropoffLocation: string; dropoffPlaceId?: string; dropoffAddress?: string; dropoffLat?: number; dropoffLng?: number; pickupDate: string; pickupTime: string; passengers: number; luggage?: string; golfBags?: number; returnJourney: boolean; itineraryMessage?: string; adminNotes?: string; quotedPrice?: number; quotedCurrency: string; estimatedFare?: number; estimatedCurrency?: string; estimatedDistanceMiles?: number; estimatedDurationMinutes?: number; estimatedFareBreakdown?: string; pricingSource?: string; requiresManualReview?: boolean; pricingCalculatedAt?: string; routeEstimateFailed?: boolean; routeEstimateFailureReason?: string; status: string; createdAt: string; updatedAt: string }
 export interface BookingRecord { id: string; quoteId: string; confirmed: boolean; createdAt: string; updatedAt: string }
 export interface QuoteAuditRecord { id: string; quoteId: string; changedByRole: string; changedByUserId?: string; previousStatus?: string; newStatus: string; note?: string; createdAt: string }
 
@@ -306,6 +306,16 @@ export const db = {
       tableName: TABLE_CUSTOMER_PROFILES,
     });
     return record;
+  },
+
+  async getCustomerProfileByUserId(userId: string) {
+    const result = await ddb.send(new ScanCommand({
+      TableName: TABLE_CUSTOMER_PROFILES,
+      FilterExpression: "userId = :userId",
+      ExpressionAttributeValues: { ":userId": userId },
+      Limit: 1,
+    }));
+    return (result.Items?.[0] as CustomerProfileRecord | undefined) || undefined;
   },
 
   async createOrUpdateDriverProfile(input: Omit<DriverProfileRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }, options?: { correlationId?: string }) {

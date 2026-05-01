@@ -22,6 +22,8 @@ export interface CreateQuoteInput {
   guestEmail?: string;
   guestName?: string;
   guestPhone?: string;
+  passengerName?: string;
+  passengerPhone?: string;
   accountType: AccountTypeValue;
   serviceType: string;
   pickupLocation: string;
@@ -78,6 +80,8 @@ export async function createQuote(input: CreateQuoteInput) {
     guestEmail: input.guestEmail,
     guestName: input.guestName,
     guestPhone: input.guestPhone,
+    passengerName: input.passengerName,
+    passengerPhone: input.passengerPhone,
     accountType: input.accountType,
     serviceType: input.serviceType,
     pickupLocation: input.pickupLocation,

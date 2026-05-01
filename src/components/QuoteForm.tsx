@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import PlaceAutocompleteInput from "@/components/PlaceAutocompleteInput";
 
 const serviceTypes = [
@@ -30,12 +31,47 @@ type EstimateResponse = {
 };
 
 export default function QuoteForm() {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState("");
   const [estimate, setEstimate] = useState<EstimateResponse | null>(null);
+  const [customerContext, setCustomerContext] = useState<{
+    loggedInCustomer: boolean;
+    email: string;
+    name: string;
+    phone: string;
+  }>({ loggedInCustomer: false, email: "", name: "", phone: "" });
+
+  useEffect(() => {
+    let active = true;
+    async function loadCustomerContext() {
+      try {
+        const response = await fetch("/api/account/profile", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = (await response.json()) as {
+          ok?: boolean;
+          user?: { email?: string; role?: string };
+          profile?: { name?: string; phone?: string } | null;
+        };
+        if (!active || !data.ok || data.user?.role !== "customer") return;
+        setCustomerContext({
+          loggedInCustomer: true,
+          email: String(data.user?.email || "").trim(),
+          name: String(data.profile?.name || "").trim(),
+          phone: String(data.profile?.phone || "").trim(),
+        });
+      } catch {
+        // Keep guest form behavior if profile lookup fails.
+      }
+    }
+    loadCustomerContext();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function calculateEstimate() {
     if (!formRef.current) return;
@@ -100,9 +136,11 @@ export default function QuoteForm() {
     const formData = new FormData(form);
 
     const payload = {
-      name: String(formData.get("name") || ""),
-      email: String(formData.get("email") || ""),
-      phone: String(formData.get("phone") || ""),
+      name: customerContext.loggedInCustomer ? customerContext.name || String(formData.get("name") || "") : String(formData.get("name") || ""),
+      email: customerContext.loggedInCustomer ? customerContext.email || String(formData.get("email") || "") : String(formData.get("email") || ""),
+      phone: customerContext.loggedInCustomer ? customerContext.phone || String(formData.get("phone") || "") : String(formData.get("phone") || ""),
+      passengerName: String(formData.get("passengerName") || ""),
+      passengerPhone: String(formData.get("passengerPhone") || ""),
       accountType: String(formData.get("accountType") || "PERSONAL"),
       serviceType: String(formData.get("serviceType") || ""),
       pickupLocation: String(formData.get("pickupLocation") || ""),
@@ -162,18 +200,25 @@ export default function QuoteForm() {
       setMessage(result.message || "Quote submitted.");
       form.reset();
       setEstimate(null);
+      router.push("/quote/confirmation");
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
     }
   }
 
+  const showNameField = !customerContext.loggedInCustomer || !customerContext.name;
+  const showEmailField = !customerContext.loggedInCustomer || !customerContext.email;
+  const showPhoneField = !customerContext.loggedInCustomer || !customerContext.phone;
+
   return (
     <form ref={formRef} onSubmit={onSubmit} className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="grid gap-5 sm:grid-cols-2">
-        <InputField label="Name" name="name" required />
-        <InputField label="Email" name="email" type="email" required />
-        <InputField label="Phone / WhatsApp" name="phone" required />
+        {showNameField && <InputField label="Booker name" name="name" required />}
+        {showEmailField && <InputField label="Booker email" name="email" type="email" required />}
+        {showPhoneField && <InputField label="Booker phone / WhatsApp" name="phone" required />}
+        <InputField label="Passenger name (if different)" name="passengerName" />
+        <InputField label="Passenger phone (if different)" name="passengerPhone" />
         <SelectField label="Account type" name="accountType" options={["PERSONAL", "BUSINESS"]} required />
         <SelectField label="Service type" name="serviceType" options={serviceTypes} required />
         <InputField label="Number of passengers" name="passengers" type="number" min={1} required />

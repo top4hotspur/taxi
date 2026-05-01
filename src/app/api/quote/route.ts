@@ -5,17 +5,7 @@ import { getCurrentSessionUser } from "@/lib/auth/guards";
 import { DbConfigMissingError } from "@/lib/db";
 import { createQuote } from "@/lib/quote/service";
 
-const required = [
-  "name",
-  "email",
-  "phone",
-  "serviceType",
-  "pickupLocation",
-  "dropoffLocation",
-  "pickupDate",
-  "pickupTime",
-  "passengers",
-] as const;
+const required = ["serviceType", "pickupLocation", "dropoffLocation", "pickupDate", "pickupTime", "passengers"] as const;
 
 export async function POST(request: Request) {
   const correlationId = crypto.randomUUID();
@@ -26,7 +16,13 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as Record<string, unknown>;
 
-    for (const field of required) {
+    const session = await getCurrentSessionUser();
+    const requiredFields: string[] = [...required];
+    if (!session || session.role !== "customer") {
+      requiredFields.push("name", "email", "phone");
+    }
+
+    for (const field of requiredFields) {
       if (typeof payload[field] !== "string" || !String(payload[field]).trim()) {
         return NextResponse.json(
           {
@@ -43,7 +39,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const session = await getCurrentSessionUser();
     const passengers = Number(payload.passengers);
     const golfBags = Number(payload.golfBags || 0);
     const pickupLat = Number(payload.pickupLat);
@@ -75,6 +70,8 @@ export async function POST(request: Request) {
       guestEmail: session ? undefined : String(payload.email),
       guestName: session ? undefined : String(payload.name),
       guestPhone: session ? undefined : String(payload.phone),
+      passengerName: String(payload.passengerName || "") || undefined,
+      passengerPhone: String(payload.passengerPhone || "") || undefined,
       accountType: String(payload.accountType || "PERSONAL") === "BUSINESS" ? "BUSINESS" : "PERSONAL",
       serviceType: String(payload.serviceType),
       pickupLocation: String(payload.pickupLocation),

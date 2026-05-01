@@ -15,6 +15,8 @@ type Quote = {
   guestEmail?: string;
   customerEmail?: string | null;
   guestPhone?: string;
+  passengerName?: string;
+  passengerPhone?: string;
   pickupLocation: string;
   pickupPlaceId?: string;
   pickupAddress?: string;
@@ -114,6 +116,8 @@ export default function AdminQuoteDetailPage() {
         <p>Name: {quote.guestName || "Account customer"}</p>
         <p>Email: {quote.guestEmail || quote.customerEmail || "From customer account"}</p>
         <p>Phone: {quote.guestPhone || "Not provided"}</p>
+        <p>Passenger name: {quote.passengerName || "Same as booker / not provided"}</p>
+        <p>Passenger phone: {quote.passengerPhone || "Same as booker / not provided"}</p>
         <p>Service: {quote.serviceType}</p>
         <p>Date/Time: {quote.pickupDate} {quote.pickupTime}</p>
         <p>Passengers: {quote.passengers}</p>
