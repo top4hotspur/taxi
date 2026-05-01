@@ -62,6 +62,7 @@ If email vars are missing, quote operations still succeed and a structured warni
 Temporary SSR/API DynamoDB credentials note:
 - `APP_AWS_ACCESS_KEY_ID` and `APP_AWS_SECRET_ACCESS_KEY` are a temporary server-side unblock for environments where runtime credentials are unavailable.
 - TODO: replace this with IAM role/AppSync/Amplify Data client pattern before long-term production hardening.
+- Use a least-privilege IAM key scoped only to required DynamoDB table actions and rotate it regularly.
 
 ## Production deployment notes
 

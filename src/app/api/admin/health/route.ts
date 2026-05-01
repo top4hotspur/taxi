@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { getCurrentSessionUser } from "@/lib/auth/guards";
+import { createServerDynamoClient } from "@/lib/db";
 
 const dbEnvVars = [
   "DDB_TABLE_USERS",
@@ -20,8 +21,7 @@ export async function GET() {
   }
 
   const ddbTables = Object.fromEntries(dbEnvVars.map((name) => [name, Boolean(process.env[name]?.trim())]));
-  const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
-  const ddbClient = new DynamoDBClient({ region });
+  const ddbClient = createServerDynamoClient();
   const ddbTableChecks = await Promise.all(
     dbEnvVars.map(async (envName) => {
       const tableName = process.env[envName]?.trim();

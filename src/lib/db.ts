@@ -8,17 +8,21 @@ const appSecretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY?.trim();
 
 // TEMPORARY PRODUCTION UNBLOCK: explicit server-side AWS credentials for SSR/API runtime.
 // TODO: Replace with IAM role/AppSync/Amplify Data client pattern before long-term production hardening.
-const ddbClient = new DynamoDBClient({
-  region,
-  ...(appAccessKeyId && appSecretAccessKey
-    ? {
-        credentials: {
-          accessKeyId: appAccessKeyId,
-          secretAccessKey: appSecretAccessKey,
-        },
-      }
-    : {}),
-});
+export function createServerDynamoClient() {
+  return new DynamoDBClient({
+    region,
+    ...(appAccessKeyId && appSecretAccessKey
+      ? {
+          credentials: {
+            accessKeyId: appAccessKeyId,
+            secretAccessKey: appSecretAccessKey,
+          },
+        }
+      : {}),
+  });
+}
+
+const ddbClient = createServerDynamoClient();
 const ddb = DynamoDBDocumentClient.from(ddbClient);
 
 const TABLE_USERS = process.env.DDB_TABLE_USERS || "NITaxiUsers";

@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 import {
   DeleteItemCommand,
   DescribeTableCommand,
-  DynamoDBClient,
   PutItemCommand,
   type KeySchemaElement,
 } from "@aws-sdk/client-dynamodb";
 import { marshall } from "@aws-sdk/util-dynamodb";
+import { createServerDynamoClient } from "@/lib/db";
 
 // TODO: Remove or lock down this diagnostic endpoint before production launch.
 
@@ -40,7 +40,6 @@ function getKeyAttributeName(keySchema: KeySchemaElement[], keyType: "HASH" | "R
 }
 
 export async function GET() {
-  const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
   const tableName = process.env.DDB_TABLE_QUOTES || "NITaxiQuotes";
   const quoteAuditTableConfigured = Boolean(process.env.DDB_TABLE_QUOTE_AUDITS?.trim());
 
@@ -64,7 +63,7 @@ export async function GET() {
     );
   }
 
-  const ddbClient = new DynamoDBClient({ region });
+  const ddbClient = createServerDynamoClient();
 
   let keySchema: KeySchemaElement[] = [];
   let tableStatus: string | undefined;
