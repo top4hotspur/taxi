@@ -122,7 +122,7 @@ export default function Header() {
                 className={`inline-flex items-center gap-1 text-sm font-medium transition ${hasServicesActive(pathname) || openMenu === "services" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
               >
                 Services
-                <span aria-hidden="true">?</span>
+                <span aria-hidden="true" className="text-xs">v</span>
               </button>
               {openMenu === "services" && (
                 <div className="absolute left-0 top-full z-50 mt-2 min-w-52">
@@ -153,7 +153,7 @@ export default function Header() {
                 className={`inline-flex items-center gap-1 text-sm font-medium transition ${openMenu === "customer" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
               >
                 Customer
-                <span aria-hidden="true">?</span>
+                <span aria-hidden="true" className="text-xs">v</span>
               </button>
               {openMenu === "customer" && (
                 <div className="absolute right-0 top-full z-50 mt-2 min-w-52">
@@ -181,7 +181,7 @@ export default function Header() {
                 className={`inline-flex items-center gap-1 text-sm font-medium transition ${openMenu === "driver" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
               >
                 Driver
-                <span aria-hidden="true">?</span>
+                <span aria-hidden="true" className="text-xs">v</span>
               </button>
               {openMenu === "driver" && (
                 <div className="absolute right-0 top-full z-50 mt-2 min-w-52">

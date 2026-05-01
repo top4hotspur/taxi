@@ -61,6 +61,12 @@ export async function GET() {
     appAwsSecretAccessKeyPresent: Boolean(process.env.APP_AWS_SECRET_ACCESS_KEY?.trim()),
     ddbTables,
     ddbTableChecks,
+    analyticsTableEnvPresent: Boolean(process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()),
+    pricingTableEnvPresent: {
+      settings: Boolean(process.env.DDB_TABLE_PRICING_SETTINGS?.trim()),
+      timeUplifts: Boolean(process.env.DDB_TABLE_PRICING_TIME_UPLIFTS?.trim()),
+      dateUplifts: Boolean(process.env.DDB_TABLE_PRICING_DATE_UPLIFTS?.trim()),
+    },
     emailEnvConfigured,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),
     googleRoutesApiKeyPresent: Boolean(process.env.GOOGLE_ROUTES_API_KEY?.trim()),

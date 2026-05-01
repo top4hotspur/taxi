@@ -15,6 +15,14 @@ type AnalyticsPayload = {
   };
   topPages: Array<{ path: string; count: number }>;
   topReferrers: Array<{ referrer: string; count: number }>;
+  diagnostics?: { tableConfigured?: boolean; tableNamePresent?: boolean };
+};
+
+type AnalyticsErrorPayload = {
+  ok: false;
+  errorCode?: string;
+  message?: string;
+  diagnostics?: { tableConfigured?: boolean; tableNamePresent?: boolean };
 };
 
 function MetricCard({ label, today, last7Days, last30Days }: { label: string; today: number; last7Days: number; last30Days: number }) {
@@ -29,26 +37,87 @@ function MetricCard({ label, today, last7Days, last30Days }: { label: string; to
 }
 
 export default function AdminAnalyticsPage() {
+  const [status, setStatus] = useState<"loading" | "loaded" | "empty" | "error">("loading");
   const [data, setData] = useState<AnalyticsPayload | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ status: number; message: string; errorCode?: string } | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/analytics", { cache: "no-store" }).then(async (res) => {
-      const json = (await res.json()) as AnalyticsPayload & { message?: string };
-      if (!res.ok || !json.ok) {
-        setError(json.message || "Unable to load analytics.");
-        return;
+    let active = true;
+    const controller = new AbortController();
+
+    async function loadAnalytics() {
+      setStatus("loading");
+      try {
+        const res = await fetch("/api/admin/analytics", { cache: "no-store", signal: controller.signal });
+        const text = await res.text();
+        let parsed: AnalyticsPayload | AnalyticsErrorPayload | null = null;
+        if (text) {
+          try {
+            parsed = JSON.parse(text) as AnalyticsPayload | AnalyticsErrorPayload;
+          } catch {
+            parsed = null;
+          }
+        }
+
+        if (!active) return;
+
+        if (!res.ok || !parsed || !("ok" in parsed) || !parsed.ok) {
+          const p = parsed as AnalyticsErrorPayload | null;
+          setError({
+            status: res.status,
+            message: p?.message || "Unable to load analytics.",
+            errorCode: p?.errorCode,
+          });
+          setStatus("error");
+          return;
+        }
+
+        const okPayload = parsed as AnalyticsPayload;
+        const hasEvents =
+          okPayload.totals.pageViews.last30Days > 0 ||
+          okPayload.totals.quoteSubmissions.last30Days > 0 ||
+          okPayload.totals.customerRegistrations.last30Days > 0 ||
+          okPayload.totals.driverRegistrations.last30Days > 0;
+
+        setData(okPayload);
+        setStatus(hasEvents ? "loaded" : "empty");
+      } catch {
+        if (!active) return;
+        setError({ status: 0, message: "Unable to load analytics." });
+        setStatus("error");
       }
-      setData(json);
-    });
+    }
+
+    loadAnalytics();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
-  if (error) return <p className="text-red-700">{error}</p>;
-  if (!data) return <p>Loading analytics...</p>;
+  if (status === "loading") return <p>Loading analytics...</p>;
+  if (status === "error" || !data) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-3xl font-bold">Admin Analytics</h1>
+        <article className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="font-semibold text-red-900">Analytics failed to load</p>
+          <p className="text-sm text-red-800">HTTP status: {error?.status ?? 0}</p>
+          <p className="text-sm text-red-800">Message: {error?.message || "Unable to load analytics."}</p>
+          {error?.errorCode && <p className="text-sm text-red-800">Code: {error.errorCode}</p>}
+        </article>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">
       <h1 className="text-3xl font-bold">Admin Analytics</h1>
+      {status === "empty" && (
+        <article className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          No analytics events recorded yet.
+        </article>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard label="Visitors" {...data.totals.visitors} />
