@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { estimateFare } from "@/lib/pricing/fare";
 import { computeRouteEstimate, RoutesApiError } from "@/lib/pricing/routes";
+import { getEffectivePricingConfig } from "@/lib/pricing/settings";
 
 export async function POST(request: Request) {
   try {
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
     const dropoffLng = Number(body.dropoffLng);
     const passengers = Number(body.passengers || 1);
     const golfBags = Number(body.golfBags || 0);
+    const pickupDate = String(body.pickupDate || "");
+    const pickupTime = String(body.pickupTime || "");
 
     const route = await computeRouteEstimate({
       pickupPlaceId: String(body.pickupPlaceId || "") || undefined,
@@ -22,17 +25,20 @@ export async function POST(request: Request) {
       dropoffLng: Number.isFinite(dropoffLng) ? dropoffLng : undefined,
     });
 
+    const pricingConfig = await getEffectivePricingConfig();
     const fare = estimateFare({
       distanceMiles: route.distanceMiles,
       durationMinutes: route.durationMinutes,
       serviceType: String(body.serviceType || ""),
+      pickupDate,
+      pickupTime,
       passengers: Number.isFinite(passengers) ? passengers : undefined,
       luggage: String(body.luggage || ""),
       golfBags: Number.isFinite(golfBags) ? golfBags : undefined,
       itineraryMessage: String(body.itineraryMessage || ""),
       pickupLocation: String(body.pickupLocation || ""),
       dropoffLocation: String(body.dropoffLocation || ""),
-    });
+    }, pricingConfig.settings, pricingConfig.timeUplifts, pricingConfig.dateUplifts);
 
     return NextResponse.json({
       ok: true,

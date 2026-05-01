@@ -93,6 +93,14 @@ export default function AdminQuoteDetailPage() {
 
   if (error) return <p className="text-red-700">{error}</p>;
   if (!quote) return <p>Loading...</p>;
+  let parsedFareBreakdown: Record<string, unknown> | null = null;
+  if (quote.estimatedFareBreakdown) {
+    try {
+      parsedFareBreakdown = JSON.parse(quote.estimatedFareBreakdown) as Record<string, unknown>;
+    } catch {
+      parsedFareBreakdown = null;
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -125,7 +133,18 @@ export default function AdminQuoteDetailPage() {
         <p>Estimated duration: {quote.estimatedDurationMinutes !== undefined ? `${quote.estimatedDurationMinutes} minutes` : "Not available"}</p>
         <p>Requires manual review: {quote.requiresManualReview ? "Yes" : "No"}</p>
         <p>Pricing calculated at: {quote.pricingCalculatedAt || "Not available"}</p>
-        <p>Fare breakdown: {quote.estimatedFareBreakdown || "Not available"}</p>
+        {parsedFareBreakdown ? (
+          <div>
+            <p>Fare breakdown:</p>
+            <ul className="list-disc pl-5">
+              {Object.entries(parsedFareBreakdown).map(([key, value]) => (
+                <li key={key}>{key}: {String(value)}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p>Fare breakdown: {quote.estimatedFareBreakdown || "Not available"}</p>
+        )}
       </div>
 
       <form onSubmit={update} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">

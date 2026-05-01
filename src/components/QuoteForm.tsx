@@ -49,6 +49,8 @@ export default function QuoteForm() {
       dropoffLat: String(formData.get("dropoffLat") || ""),
       dropoffLng: String(formData.get("dropoffLng") || ""),
       serviceType: String(formData.get("serviceType") || ""),
+      pickupDate: String(formData.get("pickupDate") || ""),
+      pickupTime: String(formData.get("pickupTime") || ""),
       passengers: String(formData.get("passengers") || ""),
       luggage: String(formData.get("luggage") || ""),
       golfBags: String(formData.get("golfBags") || "0"),

@@ -55,6 +55,9 @@ Set these in Amplify Hosting (and locally for real sending):
 - `DDB_TABLE_DRIVER_PROFILES`
 - `DDB_TABLE_DRIVER_DOCUMENTS`
 - `DDB_TABLE_DRIVER_REMINDER_LOGS`
+- `DDB_TABLE_PRICING_SETTINGS`
+- `DDB_TABLE_PRICING_TIME_UPLIFTS`
+- `DDB_TABLE_PRICING_DATE_UPLIFTS`
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 - `GOOGLE_ROUTES_API_KEY`
 
@@ -135,6 +138,12 @@ If the key is missing or the script fails to load, quote form location fields au
 3. Restrict the key as tightly as possible (server/runtime usage only where supported).
 4. Add `GOOGLE_ROUTES_API_KEY` to Amplify environment variables.
 5. Redeploy so Amplify writes runtime vars into `.env.production`.
+
+### 6.2) Configurable pricing rules
+1. Use `/admin/pricing` to manage base fare and uplift rules.
+2. Time uplift bands support active/inactive percentages by time window.
+3. Date uplift rules support single date, date range, and recurring annual date.
+4. Estimated pricing remains customer-facing guidance; admins can override final quoted price before sending.
 
 Google Places diagnostics:
 - If the UI shows address search unavailable, open browser console and check `[place-autocomplete-diagnostics]` entries.

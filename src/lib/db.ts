@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
 const appAccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID?.trim();
@@ -33,6 +33,9 @@ const TABLE_QUOTE_AUDITS = process.env.DDB_TABLE_QUOTE_AUDITS || "NITaxiQuoteAud
 const TABLE_DRIVER_PROFILES = process.env.DDB_TABLE_DRIVER_PROFILES || "NITaxiDriverProfiles";
 const TABLE_DRIVER_DOCUMENTS = process.env.DDB_TABLE_DRIVER_DOCUMENTS || "NITaxiDriverDocuments";
 const TABLE_DRIVER_REMINDER_LOGS = process.env.DDB_TABLE_DRIVER_REMINDER_LOGS || "NITaxiDriverReminderLogs";
+const TABLE_PRICING_SETTINGS = process.env.DDB_TABLE_PRICING_SETTINGS || "NITaxiPricingSettings";
+const TABLE_PRICING_TIME_UPLIFTS = process.env.DDB_TABLE_PRICING_TIME_UPLIFTS || "NITaxiPricingTimeUplifts";
+const TABLE_PRICING_DATE_UPLIFTS = process.env.DDB_TABLE_PRICING_DATE_UPLIFTS || "NITaxiPricingDateUplifts";
 
 const REQUIRED_DB_ENV_VARS = [
   "DDB_TABLE_USERS",
@@ -43,6 +46,9 @@ const REQUIRED_DB_ENV_VARS = [
   "DDB_TABLE_DRIVER_PROFILES",
   "DDB_TABLE_DRIVER_DOCUMENTS",
   "DDB_TABLE_DRIVER_REMINDER_LOGS",
+  "DDB_TABLE_PRICING_SETTINGS",
+  "DDB_TABLE_PRICING_TIME_UPLIFTS",
+  "DDB_TABLE_PRICING_DATE_UPLIFTS",
 ] as const;
 
 type Role = "CUSTOMER" | "ADMIN" | "DRIVER";
@@ -97,6 +103,47 @@ export interface DriverReminderLogRecord {
   reminderType: string;
   reminderKey: string;
   sentAt: string;
+}
+
+
+export interface PricingSettingsRecord {
+  id: string;
+  baseFare: number;
+  perMile: number;
+  perMinute: number;
+  minimumFare: number;
+  currency: string;
+  airportUpliftPercent?: number;
+  dublinAirportUpliftPercent?: number;
+  golfBagSurcharge?: number;
+  largeLuggageSurcharge?: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PricingTimeUpliftRecord {
+  id: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+  upliftPercent: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PricingDateUpliftRecord {
+  id: string;
+  label: string;
+  upliftPercent: number;
+  active: boolean;
+  ruleType: "SINGLE_DATE" | "DATE_RANGE" | "RECURRING_ANNUAL_DATE";
+  date?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 function now() { return new Date().toISOString(); }
@@ -186,6 +233,33 @@ async function putWithDiagnostics<T extends object>(item: T, ctx: DbWriteContext
       JSON.stringify({
         level: "error",
         source: "db.write",
+        correlationId: ctx.correlationId || null,
+        operation: ctx.operation,
+        tableEnvVar: ctx.tableEnvVar,
+        tableName: ctx.tableName,
+        awsErrorName: awsError?.name || "UnknownAwsError",
+        awsErrorMessage: awsError?.message || "Unknown AWS SDK error",
+        httpStatusCode: awsError?.$metadata?.httpStatusCode ?? null,
+      })
+    );
+    throw error;
+  }
+}
+
+async function deleteWithDiagnostics(idValue: string, ctx: DbWriteContext) {
+  try {
+    const schema = await getTableKeySchema(ctx.tableName);
+    const key: Record<string, unknown> = { [schema.partitionKeyName]: idValue };
+    if (schema.sortKeyName) {
+      key[schema.sortKeyName] = `${ctx.operation}#${idValue}`;
+    }
+    await ddb.send(new DeleteCommand({ TableName: ctx.tableName, Key: key }));
+  } catch (error) {
+    const awsError = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "db.delete",
         correlationId: ctx.correlationId || null,
         operation: ctx.operation,
         tableEnvVar: ctx.tableEnvVar,
@@ -478,6 +552,111 @@ export const db = {
       keySchema,
       probeId,
     };
+  },
+
+
+  async listPricingSettings() {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_PRICING_SETTINGS }));
+    return ((result.Items as PricingSettingsRecord[] | undefined) || []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  },
+
+  async getActivePricingSettings() {
+    const settings = await this.listPricingSettings();
+    return settings.find((s) => s.active) || settings[0] || null;
+  },
+
+  async upsertPricingSettings(input: Omit<PricingSettingsRecord, "id" | "createdAt" | "updatedAt"> & { id?: string }, options?: { correlationId?: string }) {
+    assertDbWriteConfig();
+    const existing = input.id ? (await this.listPricingSettings()).find((s) => s.id === input.id) : await this.getActivePricingSettings();
+    const record: PricingSettingsRecord = existing
+      ? { ...existing, ...input, updatedAt: now() }
+      : { ...input, id: id(), createdAt: now(), updatedAt: now() };
+
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "upsertPricingSettings",
+      tableEnvVar: "DDB_TABLE_PRICING_SETTINGS",
+      tableName: TABLE_PRICING_SETTINGS,
+    });
+    return record;
+  },
+
+  async listPricingTimeUplifts() {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_PRICING_TIME_UPLIFTS }));
+    return ((result.Items as PricingTimeUpliftRecord[] | undefined) || []).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  },
+
+  async replacePricingTimeUplifts(items: Array<Omit<PricingTimeUpliftRecord, "createdAt" | "updatedAt">>, options?: { correlationId?: string }) {
+    assertDbWriteConfig();
+    const existing = await this.listPricingTimeUplifts();
+    const existingById = new Map(existing.map((item) => [item.id, item]));
+
+    const records = items.map((item) => {
+      const prior = existingById.get(item.id);
+      return prior
+        ? { ...prior, ...item, updatedAt: now() }
+        : { ...item, createdAt: now(), updatedAt: now() };
+    });
+
+    for (const record of records) {
+      await putWithDiagnostics(record, {
+        correlationId: options?.correlationId,
+        operation: "replacePricingTimeUplifts",
+        tableEnvVar: "DDB_TABLE_PRICING_TIME_UPLIFTS",
+        tableName: TABLE_PRICING_TIME_UPLIFTS,
+      });
+    }
+
+    const keep = new Set(records.map((record) => record.id));
+    for (const stale of existing.filter((item) => !keep.has(item.id))) {
+      await deleteWithDiagnostics(stale.id, {
+        correlationId: options?.correlationId,
+        operation: "replacePricingTimeUplifts.delete",
+        tableEnvVar: "DDB_TABLE_PRICING_TIME_UPLIFTS",
+        tableName: TABLE_PRICING_TIME_UPLIFTS,
+      });
+    }
+
+    return records;
+  },
+
+  async listPricingDateUplifts() {
+    const result = await ddb.send(new ScanCommand({ TableName: TABLE_PRICING_DATE_UPLIFTS }));
+    return ((result.Items as PricingDateUpliftRecord[] | undefined) || []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  },
+
+  async replacePricingDateUplifts(items: Array<Omit<PricingDateUpliftRecord, "createdAt" | "updatedAt">>, options?: { correlationId?: string }) {
+    assertDbWriteConfig();
+    const existing = await this.listPricingDateUplifts();
+    const existingById = new Map(existing.map((item) => [item.id, item]));
+
+    const records = items.map((item) => {
+      const prior = existingById.get(item.id);
+      return prior
+        ? { ...prior, ...item, updatedAt: now() }
+        : { ...item, createdAt: now(), updatedAt: now() };
+    });
+
+    for (const record of records) {
+      await putWithDiagnostics(record, {
+        correlationId: options?.correlationId,
+        operation: "replacePricingDateUplifts",
+        tableEnvVar: "DDB_TABLE_PRICING_DATE_UPLIFTS",
+        tableName: TABLE_PRICING_DATE_UPLIFTS,
+      });
+    }
+
+    const keep = new Set(records.map((record) => record.id));
+    for (const stale of existing.filter((item) => !keep.has(item.id))) {
+      await deleteWithDiagnostics(stale.id, {
+        correlationId: options?.correlationId,
+        operation: "replacePricingDateUplifts.delete",
+        tableEnvVar: "DDB_TABLE_PRICING_DATE_UPLIFTS",
+        tableName: TABLE_PRICING_DATE_UPLIFTS,
+      });
+    }
+
+    return records;
   },
 
   async listCustomers() {

@@ -1,7 +1,11 @@
+import type { PricingDateUpliftRecord, PricingSettingsRecord, PricingTimeUpliftRecord } from "@/lib/db";
+
 export interface FareEstimateInput {
   distanceMiles: number;
   durationMinutes: number;
   serviceType: string;
+  pickupDate?: string;
+  pickupTime?: string;
   passengers?: number;
   luggage?: string;
   golfBags?: number;
@@ -12,27 +16,27 @@ export interface FareEstimateInput {
 
 export interface FareBreakdown {
   baseFare: number;
-  mileageComponent: number;
-  timeComponent: number;
+  distanceCharge: number;
+  timeCharge: number;
   minimumFareApplied: boolean;
+  timeUpliftPercent: number;
+  timeUpliftAmount: number;
+  dateUpliftPercent: number;
+  dateUpliftAmount: number;
   airportUpliftPlaceholder: number;
-  luggageSurchargePlaceholder: number;
+  dublinAirportUpliftPlaceholder: number;
+  golfBagSurchargePlaceholder: number;
+  largeLuggageSurchargePlaceholder: number;
+  finalEstimatedFare: number;
+  currency: string;
 }
 
 export interface FareEstimateResult {
   estimatedFare: number;
-  currency: "GBP";
+  currency: string;
   fareBreakdown: FareBreakdown;
   requiresManualReview: boolean;
 }
-
-const FARE_CONFIG = {
-  baseFare: 10,
-  perMile: 2.2,
-  perMinute: 0.35,
-  minimumFare: 25,
-  currency: "GBP" as const,
-};
 
 function detectManualReviewNeeded(input: FareEstimateInput) {
   const service = input.serviceType.toLowerCase();
@@ -45,27 +49,99 @@ function detectManualReviewNeeded(input: FareEstimateInput) {
   return multiStopHints.some((hint) => message.includes(hint));
 }
 
-export function estimateFare(input: FareEstimateInput): FareEstimateResult {
-  const baseFare = FARE_CONFIG.baseFare;
-  const mileageComponent = Number((Math.max(input.distanceMiles, 0) * FARE_CONFIG.perMile).toFixed(2));
-  const timeComponent = Number((Math.max(input.durationMinutes, 0) * FARE_CONFIG.perMinute).toFixed(2));
-  const airportUpliftPlaceholder = 0;
-  const luggageSurchargePlaceholder = 0;
+function timeToMinutes(value?: string) {
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
+  const [h, m] = value.split(":").map(Number);
+  return h * 60 + m;
+}
 
-  const rawFare = baseFare + mileageComponent + timeComponent + airportUpliftPlaceholder + luggageSurchargePlaceholder;
-  const minimumFareApplied = rawFare < FARE_CONFIG.minimumFare;
-  const estimatedFare = Number((minimumFareApplied ? FARE_CONFIG.minimumFare : rawFare).toFixed(2));
+function appliesTimeBand(pickupTime: string | undefined, band: PricingTimeUpliftRecord) {
+  const pickup = timeToMinutes(pickupTime);
+  const start = timeToMinutes(band.startTime);
+  const end = timeToMinutes(band.endTime);
+  if (pickup === null || start === null || end === null) return false;
+
+  if (start <= end) return pickup >= start && pickup <= end;
+  return pickup >= start || pickup <= end;
+}
+
+function appliesDateRule(pickupDate: string | undefined, rule: PricingDateUpliftRecord) {
+  if (!pickupDate) return false;
+  if (rule.ruleType === "SINGLE_DATE") return Boolean(rule.date && rule.date === pickupDate);
+  if (rule.ruleType === "DATE_RANGE") return Boolean(rule.startDate && rule.endDate && pickupDate >= rule.startDate && pickupDate <= rule.endDate);
+  if (rule.ruleType === "RECURRING_ANNUAL_DATE") {
+    if (!rule.date) return false;
+    const target = rule.date.slice(5);
+    return pickupDate.slice(5) === target;
+  }
+  return false;
+}
+
+function computeTimeUpliftPercent(pickupTime: string | undefined, rules: PricingTimeUpliftRecord[]) {
+  const matched = rules.find((rule) => rule.active && appliesTimeBand(pickupTime, rule));
+  return matched ? matched.upliftPercent : 0;
+}
+
+function computeDateUpliftPercent(pickupDate: string | undefined, rules: PricingDateUpliftRecord[]) {
+  const matched = rules.find((rule) => rule.active && appliesDateRule(pickupDate, rule));
+  return matched ? matched.upliftPercent : 0;
+}
+
+export function estimateFare(
+  input: FareEstimateInput,
+  settings: PricingSettingsRecord,
+  timeUplifts: PricingTimeUpliftRecord[],
+  dateUplifts: PricingDateUpliftRecord[]
+): FareEstimateResult {
+  const baseFare = settings.baseFare;
+  const distanceCharge = Number((Math.max(input.distanceMiles, 0) * settings.perMile).toFixed(2));
+  const timeCharge = Number((Math.max(input.durationMinutes, 0) * settings.perMinute).toFixed(2));
+
+  const airportUpliftPlaceholder = 0;
+  const dublinAirportUpliftPlaceholder = 0;
+  const golfBagSurchargePlaceholder = 0;
+  const largeLuggageSurchargePlaceholder = 0;
+
+  const preMinimum = baseFare + distanceCharge + timeCharge;
+  const minimumFareApplied = preMinimum < settings.minimumFare;
+  const minimumAppliedFare = minimumFareApplied ? settings.minimumFare : preMinimum;
+
+  const timeUpliftPercent = computeTimeUpliftPercent(input.pickupTime, timeUplifts);
+  const timeUpliftAmount = Number(((minimumAppliedFare * timeUpliftPercent) / 100).toFixed(2));
+
+  const dateUpliftPercent = computeDateUpliftPercent(input.pickupDate, dateUplifts);
+  const dateUpliftAmount = Number((((minimumAppliedFare + timeUpliftAmount) * dateUpliftPercent) / 100).toFixed(2));
+
+  const finalEstimatedFare = Number(
+    (
+      minimumAppliedFare +
+      timeUpliftAmount +
+      dateUpliftAmount +
+      airportUpliftPlaceholder +
+      dublinAirportUpliftPlaceholder +
+      golfBagSurchargePlaceholder +
+      largeLuggageSurchargePlaceholder
+    ).toFixed(2)
+  );
 
   return {
-    estimatedFare,
-    currency: FARE_CONFIG.currency,
+    estimatedFare: finalEstimatedFare,
+    currency: settings.currency || "GBP",
     fareBreakdown: {
       baseFare,
-      mileageComponent,
-      timeComponent,
+      distanceCharge,
+      timeCharge,
       minimumFareApplied,
+      timeUpliftPercent,
+      timeUpliftAmount,
+      dateUpliftPercent,
+      dateUpliftAmount,
       airportUpliftPlaceholder,
-      luggageSurchargePlaceholder,
+      dublinAirportUpliftPlaceholder,
+      golfBagSurchargePlaceholder,
+      largeLuggageSurchargePlaceholder,
+      finalEstimatedFare,
+      currency: settings.currency || "GBP",
     },
     requiresManualReview: detectManualReviewNeeded(input),
   };
