@@ -18,6 +18,11 @@ const serviceTypes = [
 type EstimateResponse = {
   ok: boolean;
   estimatedFare?: number | null;
+  finalEstimatedFare?: number | null;
+  outwardEstimatedFare?: number | null;
+  returnEstimatedFare?: number | null;
+  returnDiscountPercent?: number | null;
+  returnDiscountAmount?: number | null;
   currency?: string;
   distanceMiles?: number | null;
   durationMinutes?: number | null;
@@ -27,8 +32,6 @@ type EstimateResponse = {
   routeEstimateFailed?: boolean;
   routeEstimateFailureReason?: string | null;
   customerMessage?: string;
-  error?: string;
-  errorCode?: string;
 };
 
 export default function QuoteForm() {
@@ -39,12 +42,13 @@ export default function QuoteForm() {
   const [estimating, setEstimating] = useState(false);
   const [estimateError, setEstimateError] = useState("");
   const [estimate, setEstimate] = useState<EstimateResponse | null>(null);
-  const [customerContext, setCustomerContext] = useState<{
-    loggedInCustomer: boolean;
-    email: string;
-    name: string;
-    phone: string;
-  }>({ loggedInCustomer: false, email: "", name: "", phone: "" });
+  const [returnJourneyNeeded, setReturnJourneyNeeded] = useState(false);
+  const [customerContext, setCustomerContext] = useState({
+    loggedInCustomer: false,
+    email: "",
+    name: "",
+    phone: "",
+  });
 
   useEffect(() => {
     let active = true;
@@ -82,8 +86,8 @@ export default function QuoteForm() {
     if (!formRef.current) return;
     setEstimating(true);
     setEstimateError("");
-
     const formData = new FormData(formRef.current);
+
     const payload = {
       pickupLocation: String(formData.get("pickupLocation") || ""),
       pickupPlaceId: String(formData.get("pickupPlaceId") || ""),
@@ -93,12 +97,22 @@ export default function QuoteForm() {
       dropoffPlaceId: String(formData.get("dropoffPlaceId") || ""),
       dropoffLat: String(formData.get("dropoffLat") || ""),
       dropoffLng: String(formData.get("dropoffLng") || ""),
+      returnJourney: returnJourneyNeeded ? "Yes" : "No",
+      returnPickupLocation: String(formData.get("returnPickupLocation") || ""),
+      returnPickupPlaceId: String(formData.get("returnPickupPlaceId") || ""),
+      returnPickupLat: String(formData.get("returnPickupLat") || ""),
+      returnPickupLng: String(formData.get("returnPickupLng") || ""),
+      returnDropoffLocation: String(formData.get("returnDropoffLocation") || ""),
+      returnDropoffPlaceId: String(formData.get("returnDropoffPlaceId") || ""),
+      returnDropoffLat: String(formData.get("returnDropoffLat") || ""),
+      returnDropoffLng: String(formData.get("returnDropoffLng") || ""),
+      returnDate: String(formData.get("returnDate") || ""),
+      returnTime: String(formData.get("returnTime") || ""),
       serviceType: String(formData.get("serviceType") || ""),
       pickupDate: String(formData.get("pickupDate") || ""),
       pickupTime: String(formData.get("pickupTime") || ""),
       passengers: String(formData.get("passengers") || ""),
-      luggage: String(formData.get("luggage") || ""),
-      golfBags: String(formData.get("golfBags") || "0"),
+      oversizeItemCount: String(formData.get("oversizeItemCount") || "0"),
       itineraryMessage: String(formData.get("itineraryMessage") || ""),
     };
 
@@ -121,9 +135,7 @@ export default function QuoteForm() {
         return;
       }
       setEstimate(result);
-      if (result.ok) {
-        trackAnalyticsEvent("QUOTE_ESTIMATE_CALCULATED", "/quote");
-      }
+      if (result.ok) trackAnalyticsEvent("QUOTE_ESTIMATE_CALCULATED", "/quote");
       if (result.routeEstimateFailed) {
         setEstimateError(result.customerMessage || "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.");
       }
@@ -139,7 +151,6 @@ export default function QuoteForm() {
     event.preventDefault();
     setStatus("loading");
     setMessage("");
-
     const form = event.currentTarget;
     const formData = new FormData(form);
 
@@ -164,11 +175,30 @@ export default function QuoteForm() {
       pickupDate: String(formData.get("pickupDate") || ""),
       pickupTime: String(formData.get("pickupTime") || ""),
       passengers: String(formData.get("passengers") || ""),
-      luggage: String(formData.get("luggage") || ""),
-      golfBags: String(formData.get("golfBags") || "0"),
-      returnJourney: String(formData.get("returnJourney") || "No"),
+      handLuggageCount: String(formData.get("handLuggageCount") || "0"),
+      suitcaseCount: String(formData.get("suitcaseCount") || "0"),
+      oversizeItemCount: String(formData.get("oversizeItemCount") || "0"),
+      returnJourney: returnJourneyNeeded ? "Yes" : "No",
+      returnJourneyNeeded,
+      returnPickup: String(formData.get("returnPickupLocation") || ""),
+      returnPickupPlaceId: String(formData.get("returnPickupPlaceId") || ""),
+      returnPickupAddress: String(formData.get("returnPickupAddress") || ""),
+      returnPickupLat: String(formData.get("returnPickupLat") || ""),
+      returnPickupLng: String(formData.get("returnPickupLng") || ""),
+      returnDropoff: String(formData.get("returnDropoffLocation") || ""),
+      returnDropoffPlaceId: String(formData.get("returnDropoffPlaceId") || ""),
+      returnDropoffAddress: String(formData.get("returnDropoffAddress") || ""),
+      returnDropoffLat: String(formData.get("returnDropoffLat") || ""),
+      returnDropoffLng: String(formData.get("returnDropoffLng") || ""),
+      returnDate: String(formData.get("returnDate") || ""),
+      returnTime: String(formData.get("returnTime") || ""),
       itineraryMessage: String(formData.get("itineraryMessage") || ""),
       estimatedFare: estimate?.estimatedFare,
+      finalEstimatedFare: estimate?.finalEstimatedFare,
+      outwardEstimatedFare: estimate?.outwardEstimatedFare,
+      returnEstimatedFare: estimate?.returnEstimatedFare,
+      returnDiscountPercent: estimate?.returnDiscountPercent,
+      returnDiscountAmount: estimate?.returnDiscountAmount,
       estimatedCurrency: estimate?.currency,
       estimatedDistanceMiles: estimate?.distanceMiles,
       estimatedDurationMinutes: estimate?.durationMinutes,
@@ -209,6 +239,7 @@ export default function QuoteForm() {
       trackAnalyticsEvent("QUOTE_SUBMITTED", "/quote");
       form.reset();
       setEstimate(null);
+      setReturnJourneyNeeded(false);
       router.push("/quote/confirmation");
     } catch (error) {
       setStatus("error");
@@ -251,13 +282,50 @@ export default function QuoteForm() {
         />
         <InputField label="Date" name="pickupDate" type="date" required />
         <InputField label="Time" name="pickupTime" type="time" required />
-        <InputField label="Luggage" name="luggage" />
-        <InputField label="Golf bags" name="golfBags" type="number" min={0} />
-        <SelectField label="Return journey needed" name="returnJourney" options={["No", "Yes"]} required />
+        <InputField label="Hand luggage" name="handLuggageCount" type="number" min={0} />
+        <InputField label="Suitcases" name="suitcaseCount" type="number" min={0} />
+        <InputField label="Oversize items (e.g. golf clubs)" name="oversizeItemCount" type="number" min={0} />
+        <SelectField
+          label="Return journey needed? (Book return now and receive 10% off the combined fare)"
+          name="returnJourney"
+          options={["No", "Yes"]}
+          required
+          onChange={(value) => setReturnJourneyNeeded(value === "Yes")}
+        />
       </div>
 
+      {returnJourneyNeeded && (
+        <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h3 className="text-lg font-semibold text-slate-900">Return journey</h3>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <PlaceAutocompleteInput
+              label="Return pickup location"
+              required
+              locationNameField="returnPickupLocation"
+              placeIdField="returnPickupPlaceId"
+              addressField="returnPickupAddress"
+              latField="returnPickupLat"
+              lngField="returnPickupLng"
+              defaultValueFieldName="dropoffLocation"
+            />
+            <PlaceAutocompleteInput
+              label="Return drop-off location"
+              required
+              locationNameField="returnDropoffLocation"
+              placeIdField="returnDropoffPlaceId"
+              addressField="returnDropoffAddress"
+              latField="returnDropoffLat"
+              lngField="returnDropoffLng"
+              defaultValueFieldName="pickupLocation"
+            />
+            <InputField label="Return date" name="returnDate" type="date" required />
+            <InputField label="Return time" name="returnTime" type="time" required />
+          </div>
+        </section>
+      )}
+
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="itineraryMessage">Message / itinerary</label>
+        <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor="itineraryMessage">Message / Itinerary / Special Requests</label>
         <textarea id="itineraryMessage" name="itineraryMessage" rows={5} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2" />
       </div>
 
@@ -275,11 +343,20 @@ export default function QuoteForm() {
 
         {estimate?.ok && (
           <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-slate-900">
-            <p className="text-lg font-semibold">
-              Estimated price: {estimate.estimatedFare !== null && estimate.estimatedFare !== undefined ? `${estimate.estimatedFare} ${estimate.currency}` : "Manual review required"}
-            </p>
-            <p>Distance: {estimate.distanceMiles ?? "N/A"} {estimate.distanceMiles !== null && estimate.distanceMiles !== undefined ? "miles" : ""}</p>
-            <p>Journey time: {estimate.durationMinutes ?? "N/A"} {estimate.durationMinutes !== null && estimate.durationMinutes !== undefined ? "minutes" : ""}</p>
+            {returnJourneyNeeded ? (
+              <>
+                <p>Outward journey: {estimate.outwardEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
+                <p>Return journey: {estimate.returnEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
+                <p>Return booking discount ({estimate.returnDiscountPercent ?? 10}%): -{estimate.returnDiscountAmount ?? "N/A"} {estimate.currency || ""}</p>
+                <p className="text-lg font-semibold">Estimated total: {estimate.finalEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold">Estimated price: {estimate.finalEstimatedFare ?? estimate.estimatedFare ?? "N/A"} {estimate.currency || ""}</p>
+                <p>Distance: {estimate.distanceMiles ?? "N/A"} {estimate.distanceMiles !== null && estimate.distanceMiles !== undefined ? "miles" : ""}</p>
+                <p>Journey time: {estimate.durationMinutes ?? "N/A"} {estimate.durationMinutes !== null && estimate.durationMinutes !== undefined ? "minutes" : ""}</p>
+              </>
+            )}
             <p className="mt-2 text-slate-700">Subject to driver availability and final confirmation.</p>
             {estimate.routeEstimateFailed && (
               <p className="mt-2 font-medium text-slate-800">
@@ -304,7 +381,7 @@ export default function QuoteForm() {
   );
 }
 
-function InputField({ label, name, type = "text", required, min }: { label: string; name: string; type?: string; required?: boolean; min?: number; }) {
+function InputField({ label, name, type = "text", required, min }: { label: string; name: string; type?: string; required?: boolean; min?: number }) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor={name}>{label}</label>
@@ -313,13 +390,31 @@ function InputField({ label, name, type = "text", required, min }: { label: stri
   );
 }
 
-function SelectField({ label, name, options, required }: { label: string; name: string; options: string[]; required?: boolean; }) {
+function SelectField({
+  label,
+  name,
+  options,
+  required,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  options: string[];
+  required?: boolean;
+  onChange?: (value: string) => void;
+}) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor={name}>{label}</label>
-      <select id={name} name={name} required={required} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2">
+      <select
+        id={name}
+        name={name}
+        required={required}
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2"
+        onChange={(event) => onChange?.(event.target.value)}
+      >
         <option value="">Select an option</option>
-        {options.map((option) => (<option key={option} value={option}>{option}</option>))}
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     </div>
   );

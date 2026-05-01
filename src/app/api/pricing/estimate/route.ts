@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const dropoffLat = Number(body.dropoffLat);
     const dropoffLng = Number(body.dropoffLng);
     const passengers = Number(body.passengers || 1);
-    const golfBags = Number(body.golfBags || 0);
+    const oversizeItemCount = Number(body.oversizeItemCount || 0);
     const pickupDate = String(body.pickupDate || "");
     const pickupTime = String(body.pickupTime || "");
 
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const route = await computeRouteEstimate({
+    const outboundRoute = await computeRouteEstimate({
       pickupPlaceId: String(body.pickupPlaceId || "") || undefined,
       pickupLat: Number.isFinite(pickupLat) ? pickupLat : undefined,
       pickupLng: Number.isFinite(pickupLng) ? pickupLng : undefined,
@@ -49,32 +49,112 @@ export async function POST(request: Request) {
     });
 
     const pricingConfig = await getEffectivePricingConfig();
-    const fare = estimateFare({
-      distanceMiles: route.distanceMiles,
-      durationMinutes: route.durationMinutes,
+    const outwardFare = estimateFare({
+      distanceMiles: outboundRoute.distanceMiles,
+      durationMinutes: outboundRoute.durationMinutes,
       serviceType: String(body.serviceType || ""),
       pickupDate,
       pickupTime,
       passengers: Number.isFinite(passengers) ? passengers : undefined,
-      luggage: String(body.luggage || ""),
-      golfBags: Number.isFinite(golfBags) ? golfBags : undefined,
+      oversizeItemCount: Number.isFinite(oversizeItemCount) ? oversizeItemCount : undefined,
       itineraryMessage: String(body.itineraryMessage || ""),
       pickupLocation: String(body.pickupLocation || ""),
       dropoffLocation: String(body.dropoffLocation || ""),
     }, pricingConfig.settings, pricingConfig.timeUplifts, pricingConfig.dateUplifts);
 
+    const returnJourney = String(body.returnJourney || "No").toLowerCase() === "yes";
+    let returnRoute: Awaited<ReturnType<typeof computeRouteEstimate>> | null = null;
+    let returnFare: ReturnType<typeof estimateFare> | null = null;
+
+    if (returnJourney) {
+      const returnPickupLocation = String(body.returnPickupLocation || "").trim();
+      const returnDropoffLocation = String(body.returnDropoffLocation || "").trim();
+      if (!returnPickupLocation || !returnDropoffLocation || !String(body.returnDate || "").trim() || !String(body.returnTime || "").trim()) {
+        return NextResponse.json(
+          {
+            ok: true,
+            estimatedFare: null,
+            currency: pricingConfig.settings.currency || "GBP",
+            distanceMiles: null,
+            durationMinutes: null,
+            fareBreakdown: null,
+            pricingSource: "FALLBACK_MANUAL_REVIEW",
+            requiresManualReview: true,
+            routeEstimateFailed: true,
+            routeEstimateFailureReason: "Return journey details were incomplete.",
+            customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
+            errorCode: "ROUTES_INPUT_INVALID",
+          },
+          { status: 200 }
+        );
+      }
+
+      const returnPickupLat = Number(body.returnPickupLat);
+      const returnPickupLng = Number(body.returnPickupLng);
+      const returnDropoffLat = Number(body.returnDropoffLat);
+      const returnDropoffLng = Number(body.returnDropoffLng);
+
+      returnRoute = await computeRouteEstimate({
+        pickupPlaceId: String(body.returnPickupPlaceId || "") || undefined,
+        pickupLat: Number.isFinite(returnPickupLat) ? returnPickupLat : undefined,
+        pickupLng: Number.isFinite(returnPickupLng) ? returnPickupLng : undefined,
+        dropoffPlaceId: String(body.returnDropoffPlaceId || "") || undefined,
+        dropoffLat: Number.isFinite(returnDropoffLat) ? returnDropoffLat : undefined,
+        dropoffLng: Number.isFinite(returnDropoffLng) ? returnDropoffLng : undefined,
+      });
+
+      returnFare = estimateFare(
+        {
+          distanceMiles: returnRoute.distanceMiles,
+          durationMinutes: returnRoute.durationMinutes,
+          serviceType: String(body.serviceType || ""),
+          pickupDate: String(body.returnDate || ""),
+          pickupTime: String(body.returnTime || ""),
+          passengers: Number.isFinite(passengers) ? passengers : undefined,
+          oversizeItemCount: Number.isFinite(oversizeItemCount) ? oversizeItemCount : undefined,
+          itineraryMessage: String(body.itineraryMessage || ""),
+          pickupLocation: returnPickupLocation,
+          dropoffLocation: returnDropoffLocation,
+        },
+        pricingConfig.settings,
+        pricingConfig.timeUplifts,
+        pricingConfig.dateUplifts
+      );
+    }
+
+    const combinedSubtotal = Number((outwardFare.estimatedFare + (returnFare?.estimatedFare || 0)).toFixed(2));
+    const returnDiscountPercent = returnFare ? 10 : 0;
+    const returnDiscountAmount = returnFare ? Number(((combinedSubtotal * returnDiscountPercent) / 100).toFixed(2)) : 0;
+    const finalEstimatedFare = Number((combinedSubtotal - returnDiscountAmount).toFixed(2));
+    const distanceMiles = Number((outboundRoute.distanceMiles + (returnRoute?.distanceMiles || 0)).toFixed(2));
+    const durationMinutes = Number((outboundRoute.durationMinutes + (returnRoute?.durationMinutes || 0)).toFixed(1));
+
+    const combinedBreakdown = {
+      outward: outwardFare.fareBreakdown,
+      return: returnFare?.fareBreakdown || null,
+      combinedSubtotal,
+      returnDiscountPercent,
+      returnDiscountAmount,
+      finalEstimatedFare,
+    };
+
     return NextResponse.json({
       ok: true,
-      estimatedFare: fare.estimatedFare,
-      currency: fare.currency,
-      distanceMiles: route.distanceMiles,
-      durationMinutes: route.durationMinutes,
-      fareBreakdown: fare.fareBreakdown,
+      estimatedFare: finalEstimatedFare,
+      finalEstimatedFare,
+      outwardEstimatedFare: outwardFare.estimatedFare,
+      returnEstimatedFare: returnFare?.estimatedFare || null,
+      returnDiscountPercent,
+      returnDiscountAmount,
+      currency: outwardFare.currency,
+      distanceMiles,
+      durationMinutes,
+      fareBreakdown: combinedBreakdown,
       pricingSource: "GOOGLE_ROUTES",
-      requiresManualReview: fare.requiresManualReview,
+      requiresManualReview: outwardFare.requiresManualReview || Boolean(returnFare?.requiresManualReview),
       routeEstimateFailed: false,
       routeEstimateFailureReason: null,
-      routeSummary: route.routeSummary || null,
+      routeSummary: outboundRoute.routeSummary || null,
     });
   } catch (error) {
     const code = error instanceof RoutesApiError ? error.code : "PRICING_ESTIMATE_FAILED";

@@ -39,11 +39,32 @@ export interface CreateQuoteInput {
   pickupDate: string;
   pickupTime: string;
   passengers: number;
+  handLuggageCount?: number;
+  suitcaseCount?: number;
+  oversizeItemCount?: number;
   luggage?: string;
   golfBags?: number;
   returnJourney: boolean;
+  returnJourneyNeeded?: boolean;
+  returnPickup?: string;
+  returnPickupPlaceId?: string;
+  returnPickupAddress?: string;
+  returnPickupLat?: number;
+  returnPickupLng?: number;
+  returnDropoff?: string;
+  returnDropoffPlaceId?: string;
+  returnDropoffAddress?: string;
+  returnDropoffLat?: number;
+  returnDropoffLng?: number;
+  returnDate?: string;
+  returnTime?: string;
   itineraryMessage?: string;
   estimatedFare?: number;
+  finalEstimatedFare?: number;
+  outwardEstimatedFare?: number;
+  returnEstimatedFare?: number;
+  returnDiscountPercent?: number;
+  returnDiscountAmount?: number;
   estimatedCurrency?: string;
   estimatedDistanceMiles?: number;
   estimatedDurationMinutes?: number;
@@ -97,11 +118,32 @@ export async function createQuote(input: CreateQuoteInput) {
     pickupDate: input.pickupDate,
     pickupTime: input.pickupTime,
     passengers: input.passengers,
+    handLuggageCount: input.handLuggageCount,
+    suitcaseCount: input.suitcaseCount,
+    oversizeItemCount: input.oversizeItemCount,
     luggage: input.luggage,
     golfBags: input.golfBags ?? 0,
     returnJourney: input.returnJourney,
+    returnJourneyNeeded: input.returnJourneyNeeded,
+    returnPickup: input.returnPickup,
+    returnPickupPlaceId: input.returnPickupPlaceId,
+    returnPickupAddress: input.returnPickupAddress,
+    returnPickupLat: input.returnPickupLat,
+    returnPickupLng: input.returnPickupLng,
+    returnDropoff: input.returnDropoff,
+    returnDropoffPlaceId: input.returnDropoffPlaceId,
+    returnDropoffAddress: input.returnDropoffAddress,
+    returnDropoffLat: input.returnDropoffLat,
+    returnDropoffLng: input.returnDropoffLng,
+    returnDate: input.returnDate,
+    returnTime: input.returnTime,
     itineraryMessage: input.itineraryMessage,
     estimatedFare: input.estimatedFare,
+    finalEstimatedFare: input.finalEstimatedFare,
+    outwardEstimatedFare: input.outwardEstimatedFare,
+    returnEstimatedFare: input.returnEstimatedFare,
+    returnDiscountPercent: input.returnDiscountPercent,
+    returnDiscountAmount: input.returnDiscountAmount,
     estimatedCurrency: input.estimatedCurrency,
     estimatedDistanceMiles: input.estimatedDistanceMiles,
     estimatedDurationMinutes: input.estimatedDurationMinutes,

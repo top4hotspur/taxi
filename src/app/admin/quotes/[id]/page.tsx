@@ -30,11 +30,24 @@ type Quote = {
   pickupDate: string;
   pickupTime: string;
   passengers: number;
+  handLuggageCount?: number;
+  suitcaseCount?: number;
+  oversizeItemCount?: number;
   luggage?: string;
   golfBags?: number;
   returnJourney: boolean;
+  returnJourneyNeeded?: boolean;
+  returnPickup?: string;
+  returnDropoff?: string;
+  returnDate?: string;
+  returnTime?: string;
   itineraryMessage?: string;
   estimatedFare?: number;
+  finalEstimatedFare?: number;
+  outwardEstimatedFare?: number;
+  returnEstimatedFare?: number;
+  returnDiscountPercent?: number;
+  returnDiscountAmount?: number;
   estimatedCurrency?: string;
   estimatedDistanceMiles?: number;
   estimatedDurationMinutes?: number;
@@ -121,9 +134,18 @@ export default function AdminQuoteDetailPage() {
         <p>Service: {quote.serviceType}</p>
         <p>Date/Time: {quote.pickupDate} {quote.pickupTime}</p>
         <p>Passengers: {quote.passengers}</p>
-        <p>Luggage: {quote.luggage || "Not provided"}</p>
-        <p>Golf bags: {quote.golfBags ?? 0}</p>
+        <p>Hand luggage: {quote.handLuggageCount ?? 0}</p>
+        <p>Suitcases: {quote.suitcaseCount ?? 0}</p>
+        <p>Oversize items: {quote.oversizeItemCount ?? quote.golfBags ?? 0}</p>
+        {quote.luggage ? <p>Legacy luggage note: {quote.luggage}</p> : null}
         <p>Return journey: {quote.returnJourney ? "Yes" : "No"}</p>
+        {quote.returnJourneyNeeded || quote.returnJourney ? (
+          <>
+            <p>Return pickup: {quote.returnPickup || "Not provided"}</p>
+            <p>Return drop-off: {quote.returnDropoff || "Not provided"}</p>
+            <p>Return date/time: {quote.returnDate || "Not provided"} {quote.returnTime || ""}</p>
+          </>
+        ) : null}
         <p>Itinerary: {quote.itineraryMessage || "Not provided"}</p>
         <p>Pickup: {quote.pickupLocation}</p>
         <p>Pickup address: {quote.pickupAddress || "Not provided"}</p>
@@ -135,7 +157,10 @@ export default function AdminQuoteDetailPage() {
         <p>Drop-off coordinates: {quote.dropoffLat !== undefined && quote.dropoffLng !== undefined ? `${quote.dropoffLat}, ${quote.dropoffLng}` : "Not provided"}</p>
         <hr className="my-3 border-slate-200" />
         <p>Pricing source: {quote.pricingSource || "None"}</p>
-        <p>Estimated fare: {quote.estimatedFare !== undefined ? `${quote.estimatedFare} ${quote.estimatedCurrency || "GBP"}` : "Not available"}</p>
+        <p>Estimated fare: {quote.finalEstimatedFare ?? quote.estimatedFare ?? "Not available"} {quote.estimatedCurrency || "GBP"}</p>
+        <p>Outward estimated fare: {quote.outwardEstimatedFare ?? "Not available"} {quote.estimatedCurrency || "GBP"}</p>
+        <p>Return estimated fare: {quote.returnEstimatedFare ?? "Not available"} {quote.estimatedCurrency || "GBP"}</p>
+        <p>Return discount: {quote.returnDiscountPercent ?? 0}% ({quote.returnDiscountAmount ?? 0} {quote.estimatedCurrency || "GBP"})</p>
         <p>Estimated distance: {quote.estimatedDistanceMiles !== undefined ? `${quote.estimatedDistanceMiles} miles` : "Not available"}</p>
         <p>Estimated duration: {quote.estimatedDurationMinutes !== undefined ? `${quote.estimatedDurationMinutes} minutes` : "Not available"}</p>
         <p>Requires manual review: {quote.requiresManualReview ? "Yes" : "No"}</p>

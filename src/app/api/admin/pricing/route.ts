@@ -12,6 +12,10 @@ interface PricingPayload {
     perMinute: number;
     minimumFare: number;
     currency: string;
+    airportSurchargeAmount?: number;
+    standardPassengerMax?: number;
+    passengerBand_5_6_UpliftPercent?: number;
+    passengerBand_7_8_UpliftPercent?: number;
     airportUpliftPercent?: number;
     dublinAirportUpliftPercent?: number;
     golfBagSurcharge?: number;
@@ -63,6 +67,10 @@ export async function PUT(request: Request) {
     perMinute: Number(payload.settings.perMinute),
     minimumFare: Number(payload.settings.minimumFare),
     currency: String(payload.settings.currency || "GBP"),
+    airportSurchargeAmount: Number(payload.settings.airportSurchargeAmount || 5),
+    standardPassengerMax: Number(payload.settings.standardPassengerMax || 4),
+    passengerBand_5_6_UpliftPercent: Number(payload.settings.passengerBand_5_6_UpliftPercent || 0),
+    passengerBand_7_8_UpliftPercent: Number(payload.settings.passengerBand_7_8_UpliftPercent || 0),
     airportUpliftPercent: Number(payload.settings.airportUpliftPercent || 0),
     dublinAirportUpliftPercent: Number(payload.settings.dublinAirportUpliftPercent || 0),
     golfBagSurcharge: Number(payload.settings.golfBagSurcharge || 0),

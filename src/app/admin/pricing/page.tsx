@@ -29,6 +29,10 @@ type Settings = {
   perMinute: number;
   minimumFare: number;
   currency: string;
+  airportSurchargeAmount?: number;
+  standardPassengerMax?: number;
+  passengerBand_5_6_UpliftPercent?: number;
+  passengerBand_7_8_UpliftPercent?: number;
   airportUpliftPercent?: number;
   dublinAirportUpliftPercent?: number;
   golfBagSurcharge?: number;
@@ -42,6 +46,10 @@ const defaultSettings: Settings = {
   perMinute: 0.35,
   minimumFare: 25,
   currency: "GBP",
+  airportSurchargeAmount: 5,
+  standardPassengerMax: 4,
+  passengerBand_5_6_UpliftPercent: 0,
+  passengerBand_7_8_UpliftPercent: 0,
   airportUpliftPercent: 0,
   dublinAirportUpliftPercent: 0,
   golfBagSurcharge: 0,
@@ -118,6 +126,10 @@ export default function AdminPricingPage() {
           <NumberField label="Per mile" value={settings.perMile} onChange={(v) => setSettings({ ...settings, perMile: v })} />
           <NumberField label="Per minute" value={settings.perMinute} onChange={(v) => setSettings({ ...settings, perMinute: v })} />
           <NumberField label="Minimum fare" value={settings.minimumFare} onChange={(v) => setSettings({ ...settings, minimumFare: v })} />
+          <NumberField label="Airport surcharge amount" value={settings.airportSurchargeAmount || 5} onChange={(v) => setSettings({ ...settings, airportSurchargeAmount: v })} />
+          <NumberField label="Standard passenger max" value={settings.standardPassengerMax || 4} onChange={(v) => setSettings({ ...settings, standardPassengerMax: v })} />
+          <NumberField label="5-6 passengers uplift %" value={settings.passengerBand_5_6_UpliftPercent || 0} onChange={(v) => setSettings({ ...settings, passengerBand_5_6_UpliftPercent: v })} />
+          <NumberField label="7-8 passengers uplift %" value={settings.passengerBand_7_8_UpliftPercent || 0} onChange={(v) => setSettings({ ...settings, passengerBand_7_8_UpliftPercent: v })} />
           <div>
             <label className="mb-1 block text-sm">Currency</label>
             <input value={settings.currency} onChange={(e) => setSettings({ ...settings, currency: e.target.value })} className="w-full rounded border border-slate-300 px-3 py-2" />

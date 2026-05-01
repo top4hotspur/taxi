@@ -56,7 +56,71 @@ type Role = "CUSTOMER" | "ADMIN" | "DRIVER";
 
 export interface UserRecord { id: string; email: string; passwordHash: string; role: Role; createdAt: string; updatedAt: string }
 export interface CustomerProfileRecord { id: string; userId: string; accountType: string; name: string; phone: string; country: string; addressLine1: string; addressLine2?: string | null; city: string; region: string; postalCode: string; addressCountry: string; businessName?: string | null; tourOperatorName?: string | null; website?: string | null; taxIdVatNumber?: string | null; createdAt: string; updatedAt: string }
-export interface QuoteRecord { id: string; customerId?: string; guestEmail?: string; guestName?: string; guestPhone?: string; passengerName?: string; passengerPhone?: string; accountType: string; serviceType: string; pickupLocation: string; pickupPlaceId?: string; pickupAddress?: string; pickupLat?: number; pickupLng?: number; dropoffLocation: string; dropoffPlaceId?: string; dropoffAddress?: string; dropoffLat?: number; dropoffLng?: number; pickupDate: string; pickupTime: string; passengers: number; luggage?: string; golfBags?: number; returnJourney: boolean; itineraryMessage?: string; adminNotes?: string; quotedPrice?: number; quotedCurrency: string; estimatedFare?: number; estimatedCurrency?: string; estimatedDistanceMiles?: number; estimatedDurationMinutes?: number; estimatedFareBreakdown?: string; pricingSource?: string; requiresManualReview?: boolean; pricingCalculatedAt?: string; routeEstimateFailed?: boolean; routeEstimateFailureReason?: string; status: string; createdAt: string; updatedAt: string }
+export interface QuoteRecord {
+  id: string;
+  customerId?: string;
+  guestEmail?: string;
+  guestName?: string;
+  guestPhone?: string;
+  passengerName?: string;
+  passengerPhone?: string;
+  accountType: string;
+  serviceType: string;
+  pickupLocation: string;
+  pickupPlaceId?: string;
+  pickupAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLocation: string;
+  dropoffPlaceId?: string;
+  dropoffAddress?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  pickupDate: string;
+  pickupTime: string;
+  passengers: number;
+  handLuggageCount?: number;
+  suitcaseCount?: number;
+  oversizeItemCount?: number;
+  luggage?: string;
+  golfBags?: number;
+  returnJourney: boolean;
+  returnJourneyNeeded?: boolean;
+  returnPickup?: string;
+  returnPickupPlaceId?: string;
+  returnPickupAddress?: string;
+  returnPickupLat?: number;
+  returnPickupLng?: number;
+  returnDropoff?: string;
+  returnDropoffPlaceId?: string;
+  returnDropoffAddress?: string;
+  returnDropoffLat?: number;
+  returnDropoffLng?: number;
+  returnDate?: string;
+  returnTime?: string;
+  itineraryMessage?: string;
+  adminNotes?: string;
+  quotedPrice?: number;
+  quotedCurrency: string;
+  estimatedFare?: number;
+  finalEstimatedFare?: number;
+  outwardEstimatedFare?: number;
+  returnEstimatedFare?: number;
+  returnDiscountPercent?: number;
+  returnDiscountAmount?: number;
+  estimatedCurrency?: string;
+  estimatedDistanceMiles?: number;
+  estimatedDurationMinutes?: number;
+  estimatedFareBreakdown?: string;
+  pricingSource?: string;
+  requiresManualReview?: boolean;
+  pricingCalculatedAt?: string;
+  routeEstimateFailed?: boolean;
+  routeEstimateFailureReason?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface BookingRecord { id: string; quoteId: string; confirmed: boolean; createdAt: string; updatedAt: string }
 export interface QuoteAuditRecord { id: string; quoteId: string; changedByRole: string; changedByUserId?: string; previousStatus?: string; newStatus: string; note?: string; createdAt: string }
 
@@ -114,6 +178,10 @@ export interface PricingSettingsRecord {
   perMinute: number;
   minimumFare: number;
   currency: string;
+  airportSurchargeAmount?: number;
+  standardPassengerMax?: number;
+  passengerBand_5_6_UpliftPercent?: number;
+  passengerBand_7_8_UpliftPercent?: number;
   airportUpliftPercent?: number;
   dublinAirportUpliftPercent?: number;
   golfBagSurcharge?: number;

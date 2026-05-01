@@ -40,7 +40,9 @@ export async function POST(request: Request) {
     }
 
     const passengers = Number(payload.passengers);
-    const golfBags = Number(payload.golfBags || 0);
+    const handLuggageCount = Number(payload.handLuggageCount || 0);
+    const suitcaseCount = Number(payload.suitcaseCount || 0);
+    const oversizeItemCount = Number(payload.oversizeItemCount || 0);
     const pickupLat = Number(payload.pickupLat);
     const pickupLng = Number(payload.pickupLng);
     const dropoffLat = Number(payload.dropoffLat);
@@ -48,6 +50,15 @@ export async function POST(request: Request) {
     const estimatedFare = Number(payload.estimatedFare);
     const estimatedDistanceMiles = Number(payload.estimatedDistanceMiles);
     const estimatedDurationMinutes = Number(payload.estimatedDurationMinutes);
+    const finalEstimatedFare = Number(payload.finalEstimatedFare);
+    const outwardEstimatedFare = Number(payload.outwardEstimatedFare);
+    const returnEstimatedFare = Number(payload.returnEstimatedFare);
+    const returnDiscountPercent = Number(payload.returnDiscountPercent);
+    const returnDiscountAmount = Number(payload.returnDiscountAmount);
+    const returnPickupLat = Number(payload.returnPickupLat);
+    const returnPickupLng = Number(payload.returnPickupLng);
+    const returnDropoffLat = Number(payload.returnDropoffLat);
+    const returnDropoffLng = Number(payload.returnDropoffLng);
 
     if (!Number.isFinite(passengers) || passengers < 1) {
       return NextResponse.json(
@@ -87,11 +98,32 @@ export async function POST(request: Request) {
       pickupDate: String(payload.pickupDate),
       pickupTime: String(payload.pickupTime),
       passengers,
+      handLuggageCount: Number.isFinite(handLuggageCount) ? handLuggageCount : 0,
+      suitcaseCount: Number.isFinite(suitcaseCount) ? suitcaseCount : 0,
+      oversizeItemCount: Number.isFinite(oversizeItemCount) ? oversizeItemCount : 0,
       luggage: String(payload.luggage || ""),
-      golfBags: Number.isFinite(golfBags) ? golfBags : 0,
+      golfBags: Number(payload.golfBags || 0),
       returnJourney: String(payload.returnJourney || "no").toLowerCase() === "yes",
+      returnJourneyNeeded: String(payload.returnJourneyNeeded || "").toLowerCase() === "true" || String(payload.returnJourney || "no").toLowerCase() === "yes",
+      returnPickup: String(payload.returnPickup || ""),
+      returnPickupPlaceId: String(payload.returnPickupPlaceId || ""),
+      returnPickupAddress: String(payload.returnPickupAddress || ""),
+      returnPickupLat: Number.isFinite(returnPickupLat) ? returnPickupLat : undefined,
+      returnPickupLng: Number.isFinite(returnPickupLng) ? returnPickupLng : undefined,
+      returnDropoff: String(payload.returnDropoff || ""),
+      returnDropoffPlaceId: String(payload.returnDropoffPlaceId || ""),
+      returnDropoffAddress: String(payload.returnDropoffAddress || ""),
+      returnDropoffLat: Number.isFinite(returnDropoffLat) ? returnDropoffLat : undefined,
+      returnDropoffLng: Number.isFinite(returnDropoffLng) ? returnDropoffLng : undefined,
+      returnDate: String(payload.returnDate || ""),
+      returnTime: String(payload.returnTime || ""),
       itineraryMessage: String(payload.itineraryMessage || ""),
       estimatedFare: Number.isFinite(estimatedFare) ? estimatedFare : undefined,
+      finalEstimatedFare: Number.isFinite(finalEstimatedFare) ? finalEstimatedFare : undefined,
+      outwardEstimatedFare: Number.isFinite(outwardEstimatedFare) ? outwardEstimatedFare : undefined,
+      returnEstimatedFare: Number.isFinite(returnEstimatedFare) ? returnEstimatedFare : undefined,
+      returnDiscountPercent: Number.isFinite(returnDiscountPercent) ? returnDiscountPercent : undefined,
+      returnDiscountAmount: Number.isFinite(returnDiscountAmount) ? returnDiscountAmount : undefined,
       estimatedCurrency: String(payload.estimatedCurrency || "") || undefined,
       estimatedDistanceMiles: Number.isFinite(estimatedDistanceMiles) ? estimatedDistanceMiles : undefined,
       estimatedDurationMinutes: Number.isFinite(estimatedDurationMinutes) ? estimatedDurationMinutes : undefined,

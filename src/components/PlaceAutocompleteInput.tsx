@@ -91,6 +91,7 @@ interface PlaceAutocompleteInputProps {
   addressField: string;
   latField: string;
   lngField: string;
+  defaultValueFieldName?: string;
 }
 
 export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProps) {
@@ -211,6 +212,23 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
       error: message || null,
     });
   }, [diagDetail, diagReason, props.locationNameField, scriptReady]);
+
+  useEffect(() => {
+    if (!props.defaultValueFieldName || !inputRef.current) return;
+    const sourceInput = document.querySelector<HTMLInputElement>(`input[name="${props.defaultValueFieldName}"]`);
+    if (!sourceInput) return;
+    const applyDefault = () => {
+      if (!inputRef.current) return;
+      if (!inputRef.current.value.trim()) {
+        inputRef.current.value = sourceInput.value || "";
+      }
+    };
+    applyDefault();
+    sourceInput.addEventListener("input", applyDefault);
+    return () => {
+      sourceInput.removeEventListener("input", applyDefault);
+    };
+  }, [props.defaultValueFieldName]);
 
   const showFallback = !scriptReady;
   const fallbackReason = diagDetail || diagnosticMessage(diagReason);
