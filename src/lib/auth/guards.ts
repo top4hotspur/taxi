@@ -10,6 +10,7 @@ export async function getCurrentSessionUser(): Promise<SessionUser | null> {
 }
 
 export function isAdminUser(user: SessionUser | null | undefined) {
+  // TODO: Replace ADMIN_EMAIL gate with Cognito group-based authorization.
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const userEmail = user?.email?.trim().toLowerCase();
   return Boolean(adminEmail && userEmail && userEmail === adminEmail);

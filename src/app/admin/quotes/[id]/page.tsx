@@ -7,9 +7,13 @@ type Quote = {
   id: string;
   status: string;
   adminNotes?: string;
-  quotedPrice?: string;
+  quotedPrice?: number;
   quotedCurrency: string;
   serviceType: string;
+  accountType: string;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
   pickupLocation: string;
   pickupPlaceId?: string;
   pickupAddress?: string;
@@ -20,7 +24,13 @@ type Quote = {
   dropoffAddress?: string;
   dropoffLat?: number;
   dropoffLng?: number;
-  guestEmail?: string;
+  pickupDate: string;
+  pickupTime: string;
+  passengers: number;
+  luggage?: string;
+  golfBags?: number;
+  returnJourney: boolean;
+  itineraryMessage?: string;
   audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>;
 };
 
@@ -61,12 +71,12 @@ export default function AdminQuoteDetailPage() {
     setQuote({ ...quote, ...data.quote });
   }
 
-  async function action(actionName: "mark_sent" | "create_booking" | "confirm_booking") {
+  async function action(actionName: "mark_updated" | "mark_sent" | "create_booking" | "confirm_booking") {
     if (!quote) return;
     const res = await fetch(`/api/admin/quotes/${quote.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: actionName }),
+      body: JSON.stringify({ action: actionName, note: actionName.replace("_", " ") }),
     });
     const data = await res.json();
     if (!res.ok) { setError(data.message || "Action failed"); return; }
@@ -81,7 +91,17 @@ export default function AdminQuoteDetailPage() {
       <h1 className="text-3xl font-bold">Admin Quote {quote.id}</h1>
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <p>Status: <strong>{quote.status}</strong></p>
+        <p>Account type: {quote.accountType}</p>
+        <p>Name: {quote.guestName || "Account customer"}</p>
+        <p>Email: {quote.guestEmail || "From customer account"}</p>
+        <p>Phone: {quote.guestPhone || "Not provided"}</p>
         <p>Service: {quote.serviceType}</p>
+        <p>Date/Time: {quote.pickupDate} {quote.pickupTime}</p>
+        <p>Passengers: {quote.passengers}</p>
+        <p>Luggage: {quote.luggage || "Not provided"}</p>
+        <p>Golf bags: {quote.golfBags ?? 0}</p>
+        <p>Return journey: {quote.returnJourney ? "Yes" : "No"}</p>
+        <p>Itinerary: {quote.itineraryMessage || "Not provided"}</p>
         <p>Pickup: {quote.pickupLocation}</p>
         <p>Pickup address: {quote.pickupAddress || "Not provided"}</p>
         <p>Pickup place ID: {quote.pickupPlaceId || "Not provided"}</p>
@@ -106,6 +126,7 @@ export default function AdminQuoteDetailPage() {
       </form>
 
       <div className="flex flex-wrap gap-3">
+        <button onClick={() => action("mark_updated")} className="rounded bg-slate-700 px-4 py-2 text-white">Mark Quote Updated</button>
         <button onClick={() => action("mark_sent")} className="rounded bg-amber-600 px-4 py-2 text-white">Mark Quote Sent</button>
         <button onClick={() => action("create_booking")} className="rounded bg-blue-700 px-4 py-2 text-white">Create Booking</button>
         <button onClick={() => action("confirm_booking")} className="rounded bg-emerald-700 px-4 py-2 text-white">Confirm Booking</button>

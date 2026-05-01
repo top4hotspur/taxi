@@ -4,13 +4,20 @@ import { db } from "@/lib/db";
 import { getCurrentSessionUser } from "@/lib/auth/guards";
 import { sendStatusLifecycleEmails, updateQuoteStatusAudit } from "@/lib/quote/service";
 
+function toCustomerQuoteView<T extends { adminNotes?: string } | null | undefined>(quote: T) {
+  if (!quote) return quote;
+  const safeQuote = { ...quote };
+  delete safeQuote.adminNotes;
+  return safeQuote;
+}
+
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentSessionUser();
   if (!user || user.role !== "customer") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
   const quote = (await db.findQuotesByCustomer(user.userId)).find((q) => q.id === id);
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
-  return NextResponse.json({ success: true, quote: { ...quote, booking: await db.getBookingForQuote(id), audits: await db.getAuditsByQuote(id) } });
+  return NextResponse.json({ success: true, quote: { ...toCustomerQuoteView(quote), booking: await db.getBookingForQuote(id), audits: await db.getAuditsByQuote(id) } });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -32,5 +39,5 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   if (updated) await sendStatusLifecycleEmails({ quote: updated, newStatus });
 
-  return NextResponse.json({ success: true, quote: updated });
+  return NextResponse.json({ success: true, quote: toCustomerQuoteView(updated) });
 }

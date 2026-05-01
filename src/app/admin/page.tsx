@@ -24,6 +24,14 @@ type QuoteRow = {
   customer?: { email?: string } | null;
 };
 
+const summaryCards: Array<{ key: keyof Summary; label: string }> = [
+  { key: "pendingQuoteRequests", label: "New Quote Requests" },
+  { key: "quotesSent", label: "Quotes Sent" },
+  { key: "acceptedQuotes", label: "Accepted Quotes" },
+  { key: "bookingsCreated", label: "Bookings Created" },
+  { key: "bookingsConfirmed", label: "Bookings Confirmed" },
+];
+
 export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
@@ -55,10 +63,10 @@ export default function AdminPage() {
       {error && <p className="text-red-700">{error}</p>}
       {summary && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Object.entries(summary).map(([key, value]) => (
-            <article key={key} className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-sm text-slate-600">{key}</p>
-              <p className="text-2xl font-bold">{value}</p>
+          {summaryCards.map((card) => (
+            <article key={card.key} className="rounded-xl border border-slate-200 bg-white p-4">
+              <p className="text-sm text-slate-600">{card.label}</p>
+              <p className="text-2xl font-bold">{summary[card.key]}</p>
             </article>
           ))}
         </div>

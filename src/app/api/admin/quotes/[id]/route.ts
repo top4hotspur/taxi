@@ -20,12 +20,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
-  const body = (await request.json()) as { adminNotes?: string; quotedPrice?: number; quotedCurrency?: string; status?: QuoteStatusValue; action?: "mark_sent" | "create_booking" | "confirm_booking"; note?: string; };
+  const body = (await request.json()) as { adminNotes?: string; quotedPrice?: number; quotedCurrency?: string; status?: QuoteStatusValue; action?: "mark_updated" | "mark_sent" | "create_booking" | "confirm_booking"; note?: string; };
 
   const quote = await db.findQuoteById(id);
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
 
   let nextStatus = body.status;
+  if (body.action === "mark_updated") nextStatus = "QUOTE_UPDATED";
   if (body.action === "mark_sent") nextStatus = "QUOTE_SENT";
   if (body.action === "create_booking") nextStatus = "BOOKING_CREATED";
   if (body.action === "confirm_booking") nextStatus = "BOOKING_CONFIRMED";

@@ -11,13 +11,13 @@ const servicesLinks = [
 ];
 
 const customerLinks = [
-  { label: "Customer Login", href: "/customer/login" },
-  { label: "Customer Register", href: "/customer/register" },
+  { label: "Login", href: "/customer/login" },
+  { label: "Register", href: "/customer/register" },
 ];
 
 const driverLinks = [
-  { label: "Driver Login", href: "/driver/login" },
-  { label: "Driver Register", href: "/driver/register" },
+  { label: "Login", href: "/driver/login" },
+  { label: "Register", href: "/driver/register" },
 ];
 
 function isActive(pathname: string, href: string) {
