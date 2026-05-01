@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { marshall } from "@aws-sdk/util-dynamodb";
 import { createServerDynamoClient } from "@/lib/db";
+import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 
 // TODO: Remove or lock down this diagnostic endpoint before production launch.
 
@@ -40,6 +41,11 @@ function getKeyAttributeName(keySchema: KeySchemaElement[], keyType: "HASH" | "R
 }
 
 export async function GET() {
+  const user = await getCurrentSessionUser();
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+  }
+
   const tableName = process.env.DDB_TABLE_QUOTES || "NITaxiQuotes";
   const quoteAuditTableConfigured = Boolean(process.env.DDB_TABLE_QUOTE_AUDITS?.trim());
 

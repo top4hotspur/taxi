@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { QuoteStatusValue } from "@/lib/quote/constants";
 import { db } from "@/lib/db";
-import { getCurrentSessionUser } from "@/lib/auth/guards";
+import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { sendStatusLifecycleEmails, updateQuoteStatusAudit } from "@/lib/quote/service";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
   const quote = await db.findQuoteById(id);
@@ -17,7 +17,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
   const body = (await request.json()) as { adminNotes?: string; quotedPrice?: number; quotedCurrency?: string; status?: QuoteStatusValue; action?: "mark_sent" | "create_booking" | "confirm_booking"; note?: string; };
@@ -41,7 +41,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   });
 
   if (updated && nextStatus && nextStatus !== quote.status) {
-    await updateQuoteStatusAudit({ quoteId: id, changedByRole: "admin", changedByUserId: user.userId, previousStatus: quote.status, newStatus: nextStatus, note: body.note });
+    await updateQuoteStatusAudit({ quoteId: id, changedByRole: "admin", changedByUserId: user?.userId, previousStatus: quote.status, newStatus: nextStatus, note: body.note });
     await sendStatusLifecycleEmails({ quote: updated, newStatus: nextStatus });
   }
 

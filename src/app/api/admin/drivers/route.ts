@@ -1,5 +1,5 @@
-﻿import { NextResponse } from "next/server";
-import { getCurrentSessionUser } from "@/lib/auth/guards";
+import { NextResponse } from "next/server";
+import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { DRIVER_DOCUMENT_TYPES } from "@/lib/driver/constants";
 
@@ -12,7 +12,7 @@ function computeFlags(documents: { type: string; status: string; expiryDate?: st
 
 export async function GET() {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const profiles = await db.listDriverProfiles();
   const items = await Promise.all(

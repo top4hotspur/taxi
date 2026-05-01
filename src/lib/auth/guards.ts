@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifySessionToken, type SessionUser, sessionCookie } from "./session";
 
@@ -7,6 +7,12 @@ export async function getCurrentSessionUser(): Promise<SessionUser | null> {
   const token = cookieStore.get(sessionCookie.name)?.value;
   if (!token) return null;
   return verifySessionToken(token);
+}
+
+export function isAdminUser(user: SessionUser | null | undefined) {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const userEmail = user?.email?.trim().toLowerCase();
+  return Boolean(adminEmail && userEmail && userEmail === adminEmail);
 }
 
 export async function requireCustomer() {
@@ -19,7 +25,7 @@ export async function requireCustomer() {
 
 export async function requireAdmin() {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") {
+  if (!isAdminUser(user)) {
     redirect("/login");
   }
   return user;

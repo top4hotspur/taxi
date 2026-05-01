@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getCurrentSessionUser } from "@/lib/auth/guards";
+import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
   const profile = await db.getDriverProfileById(id);
@@ -16,7 +16,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+  if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
   const profile = await db.getDriverProfileById(id);

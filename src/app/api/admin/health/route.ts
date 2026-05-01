@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
-import { getCurrentSessionUser } from "@/lib/auth/guards";
+import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { createServerDynamoClient } from "@/lib/db";
 
 const dbEnvVars = [
@@ -16,8 +16,8 @@ const dbEnvVars = [
 
 export async function GET() {
   const user = await getCurrentSessionUser();
-  if (!user || user.role !== "admin") {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
 
   const ddbTables = Object.fromEntries(dbEnvVars.map((name) => [name, Boolean(process.env[name]?.trim())]));
@@ -50,7 +50,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    sessionRole: user.role,
+    sessionRole: user?.role ?? null,
     appAwsRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim()),
     effectiveRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim()),
     appAwsAccessKeyIdPresent: Boolean(process.env.APP_AWS_ACCESS_KEY_ID?.trim()),

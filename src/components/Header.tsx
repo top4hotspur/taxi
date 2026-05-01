@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const servicesLinks = [
   { label: "Airport Transfers", href: "/airport-transfers" },
@@ -34,6 +34,19 @@ export default function Header() {
   const [servicesOpen, setServicesOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [driverOpen, setDriverOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as { isAdmin?: boolean };
+        setIsAdmin(Boolean(data.isAdmin));
+      })
+      .catch(() => {
+        setIsAdmin(false);
+      });
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/50 bg-slate-950/95 backdrop-blur">
@@ -103,10 +116,11 @@ export default function Header() {
                 ))}
               </div>
             </div>
-            {/* TODO: Hide Admin navigation link before production launch. */}
-            <Link href="/admin" className={`text-sm font-medium transition ${isActive(pathname, "/admin") ? "text-amber-300" : "text-slate-200 hover:text-white"}`}>
-              Admin
-            </Link>
+            {isAdmin && (
+              <Link href="/admin" className={`text-sm font-medium transition ${isActive(pathname, "/admin") ? "text-amber-300" : "text-slate-200 hover:text-white"}`}>
+                Admin
+              </Link>
+            )}
           </div>
         </nav>
       </div>
@@ -160,10 +174,11 @@ export default function Header() {
               </div>
             )}
 
-            {/* TODO: Hide Admin navigation link before production launch. */}
-            <Link href="/admin" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/admin") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={() => setOpen(false)}>
-              Admin
-            </Link>
+            {isAdmin && (
+              <Link href="/admin" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/admin") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={() => setOpen(false)}>
+                Admin
+              </Link>
+            )}
           </div>
         </nav>
       )}
