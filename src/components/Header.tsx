@@ -11,13 +11,13 @@ const servicesLinks = [
 ];
 
 const customerLinks = [
-  { label: "Login", href: "/customer/login" },
-  { label: "Register", href: "/customer/register" },
+  { label: "Customer Login", href: "/customer/login" },
+  { label: "Customer Register", href: "/customer/register" },
 ];
 
 const driverLinks = [
-  { label: "Login", href: "/driver/login" },
-  { label: "Register", href: "/driver/register" },
+  { label: "Driver Login", href: "/driver/login" },
+  { label: "Driver Register", href: "/driver/register" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -28,15 +28,13 @@ function hasServicesActive(pathname: string) {
   return servicesLinks.some((link) => pathname === link.href) || pathname === "/services";
 }
 
-type DesktopDropdown = "services" | "customer" | "driver" | null;
-
 export default function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [driverOpen, setDriverOpen] = useState(false);
-  const [activeDesktopDropdown, setActiveDesktopDropdown] = useState<DesktopDropdown>(null);
+  const [openMenu, setOpenMenu] = useState<null | "services" | "customer" | "driver">(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const desktopNavRef = useRef<HTMLElement | null>(null);
 
@@ -56,13 +54,13 @@ export default function Header() {
     const onMouseDown = (event: MouseEvent) => {
       if (!desktopNavRef.current) return;
       if (!desktopNavRef.current.contains(event.target as Node)) {
-        setActiveDesktopDropdown(null);
+        setOpenMenu(null);
       }
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setActiveDesktopDropdown(null);
+        setOpenMenu(null);
       }
     };
 
@@ -75,18 +73,25 @@ export default function Header() {
     };
   }, []);
 
-  function toggleDesktopDropdown(target: Exclude<DesktopDropdown, null>) {
-    setActiveDesktopDropdown((current) => (current === target ? null : target));
+  function toggleMenu(target: "services" | "customer" | "driver") {
+    setOpenMenu((current) => (current === target ? null : target));
   }
 
-  function closeDesktopDropdown() {
-    setActiveDesktopDropdown(null);
+  function closeDesktopMenu() {
+    setOpenMenu(null);
+  }
+
+  function closeMobileMenu() {
+    setOpen(false);
+    setServicesOpen(false);
+    setCustomerOpen(false);
+    setDriverOpen(false);
   }
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/50 bg-slate-950/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link href="/" className="text-xl font-semibold tracking-wide text-white">
+        <Link href="/" className="text-xl font-semibold tracking-wide text-white" onClick={closeMobileMenu}>
           NI Taxi Co
         </Link>
 
@@ -102,30 +107,31 @@ export default function Header() {
 
         <nav ref={desktopNavRef} className="hidden items-center gap-6 md:flex">
           <div className="flex items-center gap-5">
-            <Link href="/" className={`text-sm font-medium transition ${isActive(pathname, "/") ? "text-amber-300" : "text-slate-200 hover:text-white"}`}>
+            <Link href="/" className={`text-sm font-medium transition ${isActive(pathname, "/") ? "text-amber-300" : "text-slate-200 hover:text-white"}`} onClick={closeDesktopMenu}>
               Home
             </Link>
-            <Link href="/quote" className={`text-sm font-medium transition ${isActive(pathname, "/quote") ? "text-amber-300" : "text-slate-200 hover:text-white"}`}>
+            <Link href="/quote" className={`text-sm font-medium transition ${isActive(pathname, "/quote") ? "text-amber-300" : "text-slate-200 hover:text-white"}`} onClick={closeDesktopMenu}>
               Request a Quote
             </Link>
             <div className="relative">
               <button
                 type="button"
-                aria-expanded={activeDesktopDropdown === "services"}
+                aria-expanded={openMenu === "services"}
                 aria-haspopup="menu"
-                onClick={() => toggleDesktopDropdown("services")}
-                className={`text-sm font-medium transition ${hasServicesActive(pathname) || activeDesktopDropdown === "services" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
+                onClick={() => toggleMenu("services")}
+                className={`inline-flex items-center gap-1 text-sm font-medium transition ${hasServicesActive(pathname) || openMenu === "services" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
               >
                 Services
+                <span aria-hidden="true">?</span>
               </button>
-              {activeDesktopDropdown === "services" && (
-                <div className="absolute left-0 top-full mt-0 min-w-52 pt-2">
+              {openMenu === "services" && (
+                <div className="absolute left-0 top-full z-50 mt-2 min-w-52">
                   <div className="rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-xl" role="menu" aria-label="Services menu">
                     {servicesLinks.map((link) => (
                       <Link
                         key={link.href}
                         href={link.href}
-                        onClick={closeDesktopDropdown}
+                        onClick={closeDesktopMenu}
                         className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}
                       >
                         {link.label}
@@ -141,21 +147,22 @@ export default function Header() {
             <div className="relative">
               <button
                 type="button"
-                aria-expanded={activeDesktopDropdown === "customer"}
+                aria-expanded={openMenu === "customer"}
                 aria-haspopup="menu"
-                onClick={() => toggleDesktopDropdown("customer")}
-                className={`text-sm font-medium transition ${activeDesktopDropdown === "customer" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
+                onClick={() => toggleMenu("customer")}
+                className={`inline-flex items-center gap-1 text-sm font-medium transition ${openMenu === "customer" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
               >
                 Customer
+                <span aria-hidden="true">?</span>
               </button>
-              {activeDesktopDropdown === "customer" && (
-                <div className="absolute right-0 top-full mt-0 min-w-52 pt-2">
+              {openMenu === "customer" && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-52">
                   <div className="rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-xl" role="menu" aria-label="Customer menu">
                     {customerLinks.map((link) => (
                       <Link
                         key={link.href}
                         href={link.href}
-                        onClick={closeDesktopDropdown}
+                        onClick={closeDesktopMenu}
                         className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}
                       >
                         {link.label}
@@ -168,21 +175,22 @@ export default function Header() {
             <div className="relative">
               <button
                 type="button"
-                aria-expanded={activeDesktopDropdown === "driver"}
+                aria-expanded={openMenu === "driver"}
                 aria-haspopup="menu"
-                onClick={() => toggleDesktopDropdown("driver")}
-                className={`text-sm font-medium transition ${activeDesktopDropdown === "driver" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
+                onClick={() => toggleMenu("driver")}
+                className={`inline-flex items-center gap-1 text-sm font-medium transition ${openMenu === "driver" ? "text-amber-300" : "text-slate-200 hover:text-white"}`}
               >
                 Driver
+                <span aria-hidden="true">?</span>
               </button>
-              {activeDesktopDropdown === "driver" && (
-                <div className="absolute right-0 top-full mt-0 min-w-52 pt-2">
+              {openMenu === "driver" && (
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-52">
                   <div className="rounded-lg border border-slate-700 bg-slate-950 p-2 shadow-xl" role="menu" aria-label="Driver menu">
                     {driverLinks.map((link) => (
                       <Link
                         key={link.href}
                         href={link.href}
-                        onClick={closeDesktopDropdown}
+                        onClick={closeDesktopMenu}
                         className={`block rounded px-3 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-200 hover:bg-slate-900 hover:text-white"}`}
                       >
                         {link.label}
@@ -193,7 +201,7 @@ export default function Header() {
               )}
             </div>
             {isAdmin && (
-              <Link href="/admin" className={`text-sm font-medium transition ${isActive(pathname, "/admin") ? "text-amber-300" : "text-slate-200 hover:text-white"}`}>
+              <Link href="/admin" className={`text-sm font-medium transition ${isActive(pathname, "/admin") ? "text-amber-300" : "text-slate-200 hover:text-white"}`} onClick={closeDesktopMenu}>
                 Admin
               </Link>
             )}
@@ -204,10 +212,10 @@ export default function Header() {
       {open && (
         <nav className="border-t border-slate-800 bg-slate-950 px-4 py-3 md:hidden">
           <div className="flex flex-col gap-2">
-            <Link href="/" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={() => setOpen(false)}>
+            <Link href="/" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={closeMobileMenu}>
               Home
             </Link>
-            <Link href="/quote" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/quote") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={() => setOpen(false)}>
+            <Link href="/quote" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/quote") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={closeMobileMenu}>
               Request a Quote
             </Link>
 
@@ -217,7 +225,7 @@ export default function Header() {
             {servicesOpen && (
               <div className="ml-3 flex flex-col">
                 {servicesLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className={`rounded px-2 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-300"}`} onClick={() => setOpen(false)}>
+                  <Link key={link.href} href={link.href} className={`rounded px-2 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-300"}`} onClick={closeMobileMenu}>
                     {link.label}
                   </Link>
                 ))}
@@ -230,7 +238,7 @@ export default function Header() {
             {customerOpen && (
               <div className="ml-3 flex flex-col">
                 {customerLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className={`rounded px-2 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-300"}`} onClick={() => setOpen(false)}>
+                  <Link key={link.href} href={link.href} className={`rounded px-2 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-300"}`} onClick={closeMobileMenu}>
                     {link.label}
                   </Link>
                 ))}
@@ -243,7 +251,7 @@ export default function Header() {
             {driverOpen && (
               <div className="ml-3 flex flex-col">
                 {driverLinks.map((link) => (
-                  <Link key={link.href} href={link.href} className={`rounded px-2 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-300"}`} onClick={() => setOpen(false)}>
+                  <Link key={link.href} href={link.href} className={`rounded px-2 py-2 text-sm ${isActive(pathname, link.href) ? "bg-slate-800 text-amber-300" : "text-slate-300"}`} onClick={closeMobileMenu}>
                     {link.label}
                   </Link>
                 ))}
@@ -251,7 +259,7 @@ export default function Header() {
             )}
 
             {isAdmin && (
-              <Link href="/admin" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/admin") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={() => setOpen(false)}>
+              <Link href="/admin" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/admin") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={closeMobileMenu}>
                 Admin
               </Link>
             )}
