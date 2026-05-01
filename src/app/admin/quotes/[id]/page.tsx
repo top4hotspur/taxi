@@ -2,11 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { getQuoteStatusLabel } from "@/lib/quote/constants";
 
 type Quote = {
   id: string;
   status: string;
   adminNotes?: string;
+  adminCustomerMessage?: string;
   quotedPrice?: number;
   quotedCurrency: string;
   serviceType: string;
@@ -81,6 +83,7 @@ export default function AdminQuoteDetailPage() {
     const fd = new FormData(event.currentTarget);
     const payload = {
       adminNotes: fd.get("adminNotes"),
+      adminCustomerMessage: fd.get("adminCustomerMessage"),
       quotedPrice: fd.get("quotedPrice") ? Number(fd.get("quotedPrice")) : undefined,
       quotedCurrency: fd.get("quotedCurrency"),
       status: fd.get("status"),
@@ -97,7 +100,7 @@ export default function AdminQuoteDetailPage() {
     setQuote({ ...quote, ...data.quote });
   }
 
-  async function action(actionName: "mark_updated" | "mark_sent" | "create_booking" | "confirm_booking") {
+  async function action(actionName: "mark_awaiting" | "mark_quoted" | "mark_accepted" | "mark_declined" | "mark_cancelled") {
     if (!quote) return;
     const res = await fetch(`/api/admin/quotes/${quote.id}`, {
       method: "PATCH",
@@ -125,6 +128,7 @@ export default function AdminQuoteDetailPage() {
       <h1 className="text-3xl font-bold">Admin Quote {quote.id}</h1>
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <p>Status: <strong>{quote.status}</strong></p>
+        <p>Status label: <strong>{getQuoteStatusLabel(quote.status)}</strong></p>
         <p>Account type: {quote.accountType}</p>
         <p>Name: {quote.guestName || "Account customer"}</p>
         <p>Email: {quote.guestEmail || quote.customerEmail || "From customer account"}</p>
@@ -183,11 +187,12 @@ export default function AdminQuoteDetailPage() {
 
       <form onSubmit={update} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <textarea name="adminNotes" defaultValue={quote.adminNotes || ""} placeholder="Admin notes" className="w-full rounded border border-slate-300 p-2" rows={4} />
+        <textarea name="adminCustomerMessage" defaultValue={quote.adminCustomerMessage || ""} placeholder="Customer-visible message" className="w-full rounded border border-slate-300 p-2" rows={3} />
         <div className="grid gap-3 sm:grid-cols-3">
           <input name="quotedPrice" type="number" step="0.01" defaultValue={quote.quotedPrice || ""} placeholder="Quoted price" className="rounded border border-slate-300 px-3 py-2" />
           <input name="quotedCurrency" defaultValue={quote.quotedCurrency || "GBP"} placeholder="Currency" className="rounded border border-slate-300 px-3 py-2" />
           <select name="status" defaultValue={quote.status} className="rounded border border-slate-300 px-3 py-2">
-            {["QUOTE_REQUESTED","QUOTE_UPDATED","QUOTE_SENT","QUOTE_ACCEPTED","QUOTE_DECLINED","QUOTE_IGNORED","BOOKING_CREATED","BOOKING_CONFIRMED","BOOKING_CANCELLED"].map((s) => <option key={s} value={s}>{s}</option>)}
+            {["SUBMITTED","AWAITING_CONFIRMATION","QUOTED","ACCEPTED","DECLINED","CANCELLED"].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <input name="note" placeholder="Audit note" className="w-full rounded border border-slate-300 px-3 py-2" />
@@ -195,10 +200,11 @@ export default function AdminQuoteDetailPage() {
       </form>
 
       <div className="flex flex-wrap gap-3">
-        <button onClick={() => action("mark_updated")} className="rounded bg-slate-700 px-4 py-2 text-white">Mark Quote Updated</button>
-        <button onClick={() => action("mark_sent")} className="rounded bg-amber-600 px-4 py-2 text-white">Mark Quote Sent</button>
-        <button onClick={() => action("create_booking")} className="rounded bg-blue-700 px-4 py-2 text-white">Create Booking</button>
-        <button onClick={() => action("confirm_booking")} className="rounded bg-emerald-700 px-4 py-2 text-white">Confirm Booking</button>
+        <button onClick={() => action("mark_awaiting")} className="rounded bg-slate-700 px-4 py-2 text-white">Set Awaiting Confirmation</button>
+        <button onClick={() => action("mark_quoted")} className="rounded bg-amber-600 px-4 py-2 text-white">Set Quoted</button>
+        <button onClick={() => action("mark_accepted")} className="rounded bg-emerald-700 px-4 py-2 text-white">Set Accepted</button>
+        <button onClick={() => action("mark_declined")} className="rounded bg-red-700 px-4 py-2 text-white">Set Declined</button>
+        <button onClick={() => action("mark_cancelled")} className="rounded bg-slate-500 px-4 py-2 text-white">Set Cancelled</button>
       </div>
     </section>
   );

@@ -2,8 +2,38 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getQuoteStatusLabel } from "@/lib/quote/constants";
+import { trackAnalyticsEvent } from "@/lib/analytics/client";
 
-type Quote = { id: string; status: string; serviceType: string; pickupLocation: string; dropoffLocation: string; quotedPrice?: string; quotedCurrency: string; itineraryMessage?: string; audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>; };
+type Quote = {
+  id: string;
+  status: string;
+  serviceType: string;
+  pickupLocation: string;
+  dropoffLocation: string;
+  pickupDate: string;
+  pickupTime: string;
+  returnJourney?: boolean;
+  returnJourneyNeeded?: boolean;
+  returnPickup?: string;
+  returnDropoff?: string;
+  returnDate?: string;
+  returnTime?: string;
+  passengers: number;
+  handLuggageCount?: number;
+  suitcaseCount?: number;
+  oversizeItemCount?: number;
+  itineraryMessage?: string;
+  estimatedFare?: number;
+  finalEstimatedFare?: number;
+  estimatedCurrency?: string;
+  estimatedFareBreakdown?: string;
+  quotedPrice?: number;
+  quotedCurrency?: string;
+  adminCustomerMessage?: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export default function AccountQuoteDetail() {
   const params = useParams<{ id: string }>();
@@ -13,43 +43,60 @@ export default function AccountQuoteDetail() {
   useEffect(() => {
     const id = params.id;
     if (!id) return;
-    fetch(`/api/account/quotes/${id}`).then(async (res) => {
+    trackAnalyticsEvent("ACCOUNT_QUOTE_DETAIL_VIEWED", `/account/quotes/${id}`);
+    fetch(`/api/account/quotes/${id}`, { cache: "no-store" }).then(async (res) => {
       const data = await res.json();
-      if (!res.ok) { setError(data.message || "Unable to load quote."); return; }
-      setQuote(data.quote);
-    });
+      if (!res.ok) {
+        setError(data.message || "Unable to load quote.");
+        return;
+      }
+      setQuote(data.quote as Quote);
+    }).catch(() => setError("Unable to load quote."));
   }, [params.id]);
-
-  async function act(action: "accept" | "decline") {
-    if (!quote) return;
-    const res = await fetch(`/api/account/quotes/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setError(data.message || "Action failed"); return; }
-    setQuote({ ...quote, status: data.quote.status });
-  }
 
   if (error) return <p className="text-red-700">{error}</p>;
   if (!quote) return <p>Loading...</p>;
 
+  let breakdown: Record<string, unknown> | null = null;
+  try {
+    breakdown = quote.estimatedFareBreakdown ? (JSON.parse(quote.estimatedFareBreakdown) as Record<string, unknown>) : null;
+  } catch {
+    breakdown = null;
+  }
+
   return (
-    <section className="space-y-4">
-      <h1 className="text-3xl font-bold">Quote {quote.id}</h1>
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm">
-        <p>Status: <strong>{quote.status}</strong></p>
-        <p>Service: {quote.serviceType}</p>
-        <p>Route: {quote.pickupLocation} to {quote.dropoffLocation}</p>
-        <p>Quoted: {quote.quotedPrice ? `${quote.quotedPrice} ${quote.quotedCurrency}` : "Pending"}</p>
-        {quote.status === "QUOTE_SENT" && (
-          <div className="mt-4 flex gap-3">
-            <button onClick={() => act("accept")} className="rounded bg-emerald-600 px-4 py-2 text-white">Accept Quote</button>
-            <button onClick={() => act("decline")} className="rounded bg-red-600 px-4 py-2 text-white">Decline Quote</button>
-          </div>
+    <section className="space-y-5">
+      <h1 className="text-3xl font-bold">Quote details</h1>
+      <article className="rounded-2xl border border-slate-200 bg-white p-6 text-sm space-y-1">
+        <p><strong>Status:</strong> {getQuoteStatusLabel(quote.status)}</p>
+        <p><strong>Service:</strong> {quote.serviceType}</p>
+        <p><strong>Outward journey:</strong> {quote.pickupLocation} to {quote.dropoffLocation}</p>
+        <p><strong>Outward date/time:</strong> {quote.pickupDate} {quote.pickupTime}</p>
+        {(quote.returnJourney || quote.returnJourneyNeeded) && (
+          <>
+            <p><strong>Return journey:</strong> {quote.returnPickup || "Not provided"} to {quote.returnDropoff || "Not provided"}</p>
+            <p><strong>Return date/time:</strong> {quote.returnDate || "Not provided"} {quote.returnTime || ""}</p>
+          </>
         )}
-      </div>
+        <p><strong>Passengers:</strong> {quote.passengers}</p>
+        <p><strong>Hand luggage:</strong> {quote.handLuggageCount ?? 0}</p>
+        <p><strong>Suitcases:</strong> {quote.suitcaseCount ?? 0}</p>
+        <p><strong>Oversize items:</strong> {quote.oversizeItemCount ?? 0}</p>
+        <p><strong>Special requests:</strong> {quote.itineraryMessage || "None"}</p>
+        <p><strong>Estimated fare:</strong> {(quote.finalEstimatedFare ?? quote.estimatedFare) ? `${quote.finalEstimatedFare ?? quote.estimatedFare} ${quote.estimatedCurrency || "GBP"}` : "Manual review required"}</p>
+        {quote.quotedPrice !== undefined && quote.quotedPrice !== null && (
+          <p><strong>Confirmed quote:</strong> {quote.quotedPrice} {quote.quotedCurrency || "GBP"}</p>
+        )}
+        {quote.adminCustomerMessage && <p><strong>Message from NI Taxi Co:</strong> {quote.adminCustomerMessage}</p>}
+        <p><strong>Created:</strong> {new Date(quote.createdAt).toLocaleString()}</p>
+        <p><strong>Updated:</strong> {new Date(quote.updatedAt).toLocaleString()}</p>
+      </article>
+      {breakdown && (
+        <article className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="text-lg font-semibold">Estimate breakdown</h2>
+          <pre className="mt-3 overflow-x-auto rounded bg-slate-50 p-3 text-xs text-slate-700">{JSON.stringify(breakdown, null, 2)}</pre>
+        </article>
+      )}
     </section>
   );
 }

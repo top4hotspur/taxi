@@ -100,6 +100,7 @@ export interface QuoteRecord {
   returnTime?: string;
   itineraryMessage?: string;
   adminNotes?: string;
+  adminCustomerMessage?: string;
   quotedPrice?: number;
   quotedCurrency: string;
   estimatedFare?: number;
@@ -225,7 +226,12 @@ export interface AnalyticsEventRecord {
     | "CUSTOMER_REGISTER_STARTED"
     | "CUSTOMER_REGISTERED"
     | "DRIVER_REGISTER_STARTED"
-    | "DRIVER_REGISTERED";
+    | "DRIVER_REGISTERED"
+    | "QUOTE_CONFIRMATION_VIEWED"
+    | "ACCOUNT_QUOTES_VIEWED"
+    | "ACCOUNT_QUOTE_DETAIL_VIEWED"
+    | "QUOTE_ESTIMATE_STALE"
+    | "QUOTE_ESTIMATE_RECALCULATED";
   path: string;
   referrer?: string;
   landingPage?: string;

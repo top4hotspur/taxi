@@ -11,11 +11,11 @@ export async function GET() {
     success: true,
     summary: {
       totalQuotes: quotes.length,
-      pendingQuoteRequests: quotes.filter((q) => q.status === "QUOTE_REQUESTED").length,
-      quotesSent: quotes.filter((q) => q.status === "QUOTE_SENT").length,
-      acceptedQuotes: quotes.filter((q) => q.status === "QUOTE_ACCEPTED").length,
-      bookingsCreated: quotes.filter((q) => q.status === "BOOKING_CREATED").length,
-      bookingsConfirmed: quotes.filter((q) => q.status === "BOOKING_CONFIRMED").length,
+      pendingQuoteRequests: quotes.filter((q) => q.status === "SUBMITTED" || q.status === "AWAITING_CONFIRMATION").length,
+      quotesSent: quotes.filter((q) => q.status === "QUOTED").length,
+      acceptedQuotes: quotes.filter((q) => q.status === "ACCEPTED").length,
+      bookingsCreated: quotes.filter((q) => q.status === "AWAITING_CONFIRMATION").length,
+      bookingsConfirmed: quotes.filter((q) => q.status === "ACCEPTED").length,
     },
   });
 }

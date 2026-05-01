@@ -10,8 +10,6 @@ import {
   adminQuoteAcceptedEmail,
   adminQuoteDeclinedEmail,
   adminBookingCreatedEmail,
-  customerBookingConfirmedEmail,
-  adminBookingConfirmedEmail,
 } from "@/lib/email/templates";
 
 const adminEmail = process.env.ADMIN_EMAIL || "";
@@ -154,7 +152,7 @@ export async function createQuote(input: CreateQuoteInput) {
     routeEstimateFailed: input.routeEstimateFailed,
     routeEstimateFailureReason: input.routeEstimateFailureReason,
     quotedCurrency: "GBP",
-    status: "QUOTE_REQUESTED",
+    status: "SUBMITTED",
   }, { correlationId: input.correlationId });
 
   await db.createAudit({
@@ -162,7 +160,7 @@ export async function createQuote(input: CreateQuoteInput) {
     changedByRole: input.customerId ? "customer" : "guest",
     changedByUserId: input.customerId,
     previousStatus: undefined,
-    newStatus: "QUOTE_REQUESTED",
+    newStatus: "SUBMITTED",
     note: "Quote created",
   }, { correlationId: input.correlationId });
 
@@ -205,17 +203,17 @@ export async function sendStatusLifecycleEmails(args: {
   const { quote, newStatus } = args;
   const recipient = await resolveQuoteRecipient(quote);
 
-  if (newStatus === "QUOTE_UPDATED" && recipient.email) {
+  if (newStatus === "AWAITING_CONFIRMATION" && recipient.email) {
     const t = customerQuoteUpdatedEmail(quote, recipient.isGuest);
     await sendEmail({ to: recipient.email, subject: t.subject, text: t.text });
   }
 
-  if (newStatus === "QUOTE_SENT" && recipient.email) {
+  if (newStatus === "QUOTED" && recipient.email) {
     const t = customerQuoteSentEmail(quote, recipient.isGuest);
     await sendEmail({ to: recipient.email, subject: t.subject, text: t.text });
   }
 
-  if (newStatus === "QUOTE_ACCEPTED") {
+  if (newStatus === "ACCEPTED") {
     if (recipient.email) {
       const t = customerQuoteAcceptedEmail(quote, recipient.isGuest);
       await sendEmail({ to: recipient.email, subject: t.subject, text: t.text });
@@ -224,22 +222,13 @@ export async function sendStatusLifecycleEmails(args: {
     await maybeAdminEmail(adminT.subject, adminT.text);
   }
 
-  if (newStatus === "QUOTE_DECLINED") {
+  if (newStatus === "DECLINED") {
     const adminT = adminQuoteDeclinedEmail(quote);
     await maybeAdminEmail(adminT.subject, adminT.text);
   }
 
-  if (newStatus === "BOOKING_CREATED") {
+  if (newStatus === "AWAITING_CONFIRMATION") {
     const adminT = adminBookingCreatedEmail(quote);
-    await maybeAdminEmail(adminT.subject, adminT.text);
-  }
-
-  if (newStatus === "BOOKING_CONFIRMED") {
-    if (recipient.email) {
-      const t = customerBookingConfirmedEmail(quote, recipient.isGuest);
-      await sendEmail({ to: recipient.email, subject: t.subject, text: t.text });
-    }
-    const adminT = adminBookingConfirmedEmail(quote);
     await maybeAdminEmail(adminT.subject, adminT.text);
   }
 }
