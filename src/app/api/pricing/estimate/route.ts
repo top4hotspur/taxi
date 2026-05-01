@@ -4,8 +4,9 @@ import { computeRouteEstimate, RoutesApiError } from "@/lib/pricing/routes";
 import { getEffectivePricingConfig } from "@/lib/pricing/settings";
 
 export async function POST(request: Request) {
+  let body: Record<string, unknown> = {};
   try {
-    const body = (await request.json()) as Record<string, unknown>;
+    body = (await request.json()) as Record<string, unknown>;
 
     const pickupLat = Number(body.pickupLat);
     const pickupLng = Number(body.pickupLng);
@@ -15,6 +16,28 @@ export async function POST(request: Request) {
     const golfBags = Number(body.golfBags || 0);
     const pickupDate = String(body.pickupDate || "");
     const pickupTime = String(body.pickupTime || "");
+
+    const pickupLocation = String(body.pickupLocation || "").trim();
+    const dropoffLocation = String(body.dropoffLocation || "").trim();
+    if (!pickupLocation || !dropoffLocation) {
+      return NextResponse.json(
+        {
+          ok: true,
+          estimatedFare: null,
+          currency: "GBP",
+          distanceMiles: null,
+          durationMinutes: null,
+          fareBreakdown: null,
+          pricingSource: "FALLBACK_MANUAL_REVIEW",
+          requiresManualReview: true,
+          routeEstimateFailed: true,
+          routeEstimateFailureReason: "Route details were incomplete.",
+          customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
+          errorCode: "ROUTES_INPUT_INVALID",
+        },
+        { status: 200 }
+      );
+    }
 
     const route = await computeRouteEstimate({
       pickupPlaceId: String(body.pickupPlaceId || "") || undefined,
@@ -47,28 +70,64 @@ export async function POST(request: Request) {
       distanceMiles: route.distanceMiles,
       durationMinutes: route.durationMinutes,
       fareBreakdown: fare.fareBreakdown,
+      pricingSource: "GOOGLE_ROUTES",
       requiresManualReview: fare.requiresManualReview,
+      routeEstimateFailed: false,
+      routeEstimateFailureReason: null,
       routeSummary: route.routeSummary || null,
     });
   } catch (error) {
+    const code = error instanceof RoutesApiError ? error.code : "PRICING_ESTIMATE_FAILED";
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "api.pricing.estimate",
+        errorCode: code,
+        message: error instanceof Error ? error.message : "Unknown pricing error",
+        pickupLocation: String(body.pickupLocation || ""),
+        dropoffLocation: String(body.dropoffLocation || ""),
+      })
+    );
+
     if (error instanceof RoutesApiError) {
       return NextResponse.json(
         {
-          ok: false,
+          ok: true,
+          estimatedFare: null,
+          currency: "GBP",
+          distanceMiles: null,
+          durationMinutes: null,
+          fareBreakdown: null,
+          pricingSource: "FALLBACK_MANUAL_REVIEW",
+          requiresManualReview: true,
+          routeEstimateFailed: true,
+          routeEstimateFailureReason:
+            error.code === "ROUTES_CONFIG_MISSING"
+              ? "Automatic route pricing is temporarily unavailable."
+              : "Route estimate could not be calculated automatically.",
+          customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
           errorCode: error.code,
-          error: error.message,
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 
     return NextResponse.json(
       {
-        ok: false,
+        ok: true,
+        estimatedFare: null,
+        currency: "GBP",
+        distanceMiles: null,
+        durationMinutes: null,
+        fareBreakdown: null,
+        pricingSource: "FALLBACK_MANUAL_REVIEW",
+        requiresManualReview: true,
+        routeEstimateFailed: true,
+        routeEstimateFailureReason: "Automatic route pricing is temporarily unavailable.",
+        customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
         errorCode: "PRICING_ESTIMATE_FAILED",
-        error: "Unable to calculate estimated fare right now.",
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

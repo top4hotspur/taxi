@@ -49,6 +49,8 @@ export interface CreateQuoteInput {
   pricingSource?: string;
   requiresManualReview?: boolean;
   pricingCalculatedAt?: string;
+  routeEstimateFailed?: boolean;
+  routeEstimateFailureReason?: string;
 }
 
 export interface QuoteNotificationOutcome {
@@ -103,6 +105,8 @@ export async function createQuote(input: CreateQuoteInput) {
     pricingSource: input.pricingSource,
     requiresManualReview: input.requiresManualReview,
     pricingCalculatedAt: input.pricingCalculatedAt,
+    routeEstimateFailed: input.routeEstimateFailed,
+    routeEstimateFailureReason: input.routeEstimateFailureReason,
     quotedCurrency: "GBP",
     status: "QUOTE_REQUESTED",
   }, { correlationId: input.correlationId });

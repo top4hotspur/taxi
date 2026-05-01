@@ -40,6 +40,8 @@ type Quote = {
   pricingSource?: string;
   requiresManualReview?: boolean;
   pricingCalculatedAt?: string;
+  routeEstimateFailed?: boolean;
+  routeEstimateFailureReason?: string;
   audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>;
 };
 
@@ -133,6 +135,8 @@ export default function AdminQuoteDetailPage() {
         <p>Estimated distance: {quote.estimatedDistanceMiles !== undefined ? `${quote.estimatedDistanceMiles} miles` : "Not available"}</p>
         <p>Estimated duration: {quote.estimatedDurationMinutes !== undefined ? `${quote.estimatedDurationMinutes} minutes` : "Not available"}</p>
         <p>Requires manual review: {quote.requiresManualReview ? "Yes" : "No"}</p>
+        <p>Route estimate failed: {quote.routeEstimateFailed ? "Yes" : "No"}</p>
+        <p>Route estimate failure reason: {quote.routeEstimateFailureReason || "None"}</p>
         <p>Pricing calculated at: {quote.pricingCalculatedAt || "Not available"}</p>
         {parsedFareBreakdown ? (
           <div>

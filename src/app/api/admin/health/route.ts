@@ -62,5 +62,6 @@ export async function GET() {
     ddbTableChecks,
     emailEnvConfigured,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),
+    googleRoutesApiKeyPresent: Boolean(process.env.GOOGLE_ROUTES_API_KEY?.trim()),
   });
 }

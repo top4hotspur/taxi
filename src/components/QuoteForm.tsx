@@ -15,12 +15,16 @@ const serviceTypes = [
 
 type EstimateResponse = {
   ok: boolean;
-  estimatedFare?: number;
+  estimatedFare?: number | null;
   currency?: string;
-  distanceMiles?: number;
-  durationMinutes?: number;
-  fareBreakdown?: Record<string, unknown>;
+  distanceMiles?: number | null;
+  durationMinutes?: number | null;
+  fareBreakdown?: Record<string, unknown> | null;
+  pricingSource?: string;
   requiresManualReview?: boolean;
+  routeEstimateFailed?: boolean;
+  routeEstimateFailureReason?: string | null;
+  customerMessage?: string;
   error?: string;
   errorCode?: string;
 };
@@ -70,12 +74,15 @@ export default function QuoteForm() {
         body: JSON.stringify(payload),
       });
       const result = (await response.json()) as EstimateResponse;
-      if (!response.ok || !result.ok) {
-        setEstimateError(result.error || "Unable to calculate estimate right now.");
+      if (!response.ok) {
+        setEstimateError("Unable to calculate estimate right now.");
         setEstimate(null);
         return;
       }
       setEstimate(result);
+      if (result.routeEstimateFailed) {
+        setEstimateError(result.customerMessage || "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.");
+      }
     } catch {
       setEstimateError("Unable to calculate estimate right now.");
       setEstimate(null);
@@ -120,9 +127,11 @@ export default function QuoteForm() {
       estimatedDistanceMiles: estimate?.distanceMiles,
       estimatedDurationMinutes: estimate?.durationMinutes,
       estimatedFareBreakdown: estimate?.fareBreakdown ? JSON.stringify(estimate.fareBreakdown) : "",
-      pricingSource: estimate?.ok ? "GOOGLE_ROUTES" : "",
+      pricingSource: estimate?.pricingSource || "",
       requiresManualReview: Boolean(estimate?.requiresManualReview),
-      pricingCalculatedAt: estimate?.ok ? new Date().toISOString() : "",
+      pricingCalculatedAt: estimate ? new Date().toISOString() : "",
+      routeEstimateFailed: Boolean(estimate?.routeEstimateFailed),
+      routeEstimateFailureReason: String(estimate?.routeEstimateFailureReason || ""),
     };
 
     try {
@@ -213,11 +222,16 @@ export default function QuoteForm() {
         {estimate?.ok && (
           <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-slate-900">
             <p className="text-lg font-semibold">
-              Estimated price: {estimate.estimatedFare} {estimate.currency}
+              Estimated price: {estimate.estimatedFare !== null && estimate.estimatedFare !== undefined ? `${estimate.estimatedFare} ${estimate.currency}` : "Manual review required"}
             </p>
-            <p>Distance: {estimate.distanceMiles} miles</p>
-            <p>Journey time: {estimate.durationMinutes} minutes</p>
+            <p>Distance: {estimate.distanceMiles ?? "N/A"} {estimate.distanceMiles !== null && estimate.distanceMiles !== undefined ? "miles" : ""}</p>
+            <p>Journey time: {estimate.durationMinutes ?? "N/A"} {estimate.durationMinutes !== null && estimate.durationMinutes !== undefined ? "minutes" : ""}</p>
             <p className="mt-2 text-slate-700">Subject to driver availability and final confirmation.</p>
+            {estimate.routeEstimateFailed && (
+              <p className="mt-2 font-medium text-slate-800">
+                We could not calculate this route automatically. Submit your request and we will confirm the price manually.
+              </p>
+            )}
             {estimate.requiresManualReview && (
               <p className="mt-2 font-medium text-slate-800">
                 This request requires manual review for final pricing (tours, golf groups, events, or complex itineraries).

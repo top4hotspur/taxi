@@ -102,6 +102,8 @@ export async function POST(request: Request) {
       pricingSource: String(payload.pricingSource || "") || undefined,
       requiresManualReview: String(payload.requiresManualReview || "").toLowerCase() === "true",
       pricingCalculatedAt: String(payload.pricingCalculatedAt || "") || undefined,
+      routeEstimateFailed: String(payload.routeEstimateFailed || "").toLowerCase() === "true",
+      routeEstimateFailureReason: String(payload.routeEstimateFailureReason || "") || undefined,
     });
 
     quoteSaved = true;

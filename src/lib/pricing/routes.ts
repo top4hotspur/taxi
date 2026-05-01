@@ -106,6 +106,12 @@ export async function computeRouteEstimate(input: RouteEstimateInput): Promise<R
 
   const distanceMeters = Number(route.distanceMeters);
   const durationSeconds = parseDurationSeconds(route.duration);
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) {
+    throw new RoutesApiError("ROUTES_DISTANCE_MISSING", "Route distance was not returned.");
+  }
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    throw new RoutesApiError("ROUTES_DURATION_MISSING", "Route duration was not returned.");
+  }
   const distanceMiles = Number((distanceMeters / 1609.344).toFixed(2));
   const durationMinutes = Number((durationSeconds / 60).toFixed(1));
 
