@@ -36,7 +36,7 @@ const TABLE_DRIVER_REMINDER_LOGS = process.env.DDB_TABLE_DRIVER_REMINDER_LOGS ||
 const TABLE_PRICING_SETTINGS = process.env.DDB_TABLE_PRICING_SETTINGS || "NITaxiPricingSettings";
 const TABLE_PRICING_TIME_UPLIFTS = process.env.DDB_TABLE_PRICING_TIME_UPLIFTS || "NITaxiPricingTimeUplifts";
 const TABLE_PRICING_DATE_UPLIFTS = process.env.DDB_TABLE_PRICING_DATE_UPLIFTS || "NITaxiPricingDateUplifts";
-const TABLE_ANALYTICS_EVENTS = process.env.DDB_TABLE_ANALYTICS_EVENTS || "ni-taxi-analytics-events";
+const TABLE_ANALYTICS_EVENTS = process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim();
 
 const REQUIRED_DB_ENV_VARS = [
   "DDB_TABLE_USERS",
@@ -770,7 +770,7 @@ export const db = {
   },
 
   async createAnalyticsEvent(event: Omit<AnalyticsEventRecord, "eventId" | "createdAt"> & { eventId?: string }, options?: { correlationId?: string }) {
-    if (!process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()) {
+    if (!TABLE_ANALYTICS_EVENTS) {
       throw new DbConfigMissingError(["DDB_TABLE_ANALYTICS_EVENTS"]);
     }
     const record: AnalyticsEventRecord = {
@@ -788,6 +788,9 @@ export const db = {
   },
 
   async listAnalyticsEvents() {
+    if (!TABLE_ANALYTICS_EVENTS) {
+      throw new DbConfigMissingError(["DDB_TABLE_ANALYTICS_EVENTS"]);
+    }
     const result = await ddb.send(new ScanCommand({ TableName: TABLE_ANALYTICS_EVENTS }));
     return ((result.Items as AnalyticsEventRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },

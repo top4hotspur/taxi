@@ -105,6 +105,12 @@ export default function AdminAnalyticsPage() {
           <p className="text-sm text-red-800">HTTP status: {error?.status ?? 0}</p>
           <p className="text-sm text-red-800">Message: {error?.message || "Unable to load analytics."}</p>
           {error?.errorCode && <p className="text-sm text-red-800">Code: {error.errorCode}</p>}
+          {error?.errorCode === "ANALYTICS_NOT_CONFIGURED" && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-white p-3 text-sm text-red-900">
+              <p>Analytics is not configured. Add <code>DDB_TABLE_ANALYTICS_EVENTS</code> to Amplify environment variables and redeploy.</p>
+              <p className="mt-1">Expected value: <code>DDB_TABLE_ANALYTICS_EVENTS=ni-taxi-analytics-events</code></p>
+            </div>
+          )}
         </article>
       </section>
     );

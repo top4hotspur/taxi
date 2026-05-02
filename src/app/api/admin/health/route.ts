@@ -62,6 +62,11 @@ export async function GET() {
     ddbTables,
     ddbTableChecks,
     analyticsTableEnvPresent: Boolean(process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()),
+    analyticsTableConfig: {
+      envVar: "DDB_TABLE_ANALYTICS_EVENTS",
+      present: Boolean(process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()),
+      recommendedValue: "ni-taxi-analytics-events",
+    },
     pricingTableEnvPresent: {
       settings: Boolean(process.env.DDB_TABLE_PRICING_SETTINGS?.trim()),
       timeUplifts: Boolean(process.env.DDB_TABLE_PRICING_TIME_UPLIFTS?.trim()),
