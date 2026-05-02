@@ -66,7 +66,9 @@ export async function GET() {
       envVar: "DDB_TABLE_ANALYTICS_EVENTS",
       present: Boolean(process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()),
       recommendedValue: "ni-taxi-analytics-events",
+      expectedSchema: "day:String, createdAtEventId:String",
     },
+    awsRegionInUse: process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim() || "eu-west-2",
     pricingTableEnvPresent: {
       settings: Boolean(process.env.DDB_TABLE_PRICING_SETTINGS?.trim()),
       timeUplifts: Boolean(process.env.DDB_TABLE_PRICING_TIME_UPLIFTS?.trim()),

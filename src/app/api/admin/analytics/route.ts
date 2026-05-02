@@ -13,6 +13,18 @@ function getWindowStart(days: number) {
   return d;
 }
 
+function getPastDaysList(days: number) {
+  const list: string[] = [];
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  for (let i = 0; i < days; i += 1) {
+    const current = new Date(date);
+    current.setDate(date.getDate() - i);
+    list.push(current.toISOString().slice(0, 10));
+  }
+  return list;
+}
+
 export async function GET() {
   const user = await getCurrentSessionUser();
   if (!isAdminUser(user)) return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
@@ -21,6 +33,9 @@ export async function GET() {
   const diagnostics = {
     tableConfigured: Boolean(tableName),
     tableNamePresent: Boolean(tableName),
+    tableName: tableName || null,
+    expectedKeySchema: "day:String, createdAtEventId:String",
+    region: process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2",
   };
 
   if (!tableName) {
@@ -37,13 +52,29 @@ export async function GET() {
 
   try {
     const ddbClient = createServerDynamoClient();
-    await ddbClient.send(new DescribeTableCommand({ TableName: tableName }));
-  } catch {
+    const describe = await ddbClient.send(new DescribeTableCommand({ TableName: tableName }));
+    const keySchema = describe.Table?.KeySchema || [];
+    const hashKey = keySchema.find((k) => k.KeyType === "HASH")?.AttributeName;
+    const rangeKey = keySchema.find((k) => k.KeyType === "RANGE")?.AttributeName;
+    if (hashKey !== "day" || rangeKey !== "createdAtEventId") {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "ANALYTICS_SCHEMA_MISMATCH",
+          message: "Analytics table schema does not match expected keys.",
+          diagnostics,
+        },
+        { status: 503 }
+      );
+    }
+  } catch (error) {
+    const awsError = error as { name?: string };
     return NextResponse.json(
       {
         ok: false,
         errorCode: "ANALYTICS_TABLE_UNAVAILABLE",
         message: "Analytics table unavailable.",
+        awsErrorName: awsError?.name || "UnknownAwsError",
         diagnostics,
       },
       { status: 503 }
@@ -51,7 +82,7 @@ export async function GET() {
   }
 
   try {
-    const events = await db.listAnalyticsEvents();
+    const events = await db.listAnalyticsEventsByDays(getPastDaysList(30));
     const windows: Record<WindowKey, Date> = {
       today: getWindowStart(1),
       last7Days: getWindowStart(7),
@@ -114,12 +145,14 @@ export async function GET() {
       topReferrers,
       diagnostics,
     });
-  } catch {
+  } catch (error) {
+    const awsError = error as { name?: string };
     return NextResponse.json(
       {
         ok: false,
         errorCode: "ANALYTICS_QUERY_FAILED",
         message: "Analytics table unavailable.",
+        awsErrorName: awsError?.name || "UnknownAwsError",
         diagnostics,
       },
       { status: 503 }

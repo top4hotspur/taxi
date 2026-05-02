@@ -22,7 +22,8 @@ type AnalyticsErrorPayload = {
   ok: false;
   errorCode?: string;
   message?: string;
-  diagnostics?: { tableConfigured?: boolean; tableNamePresent?: boolean };
+  awsErrorName?: string;
+  diagnostics?: { tableConfigured?: boolean; tableNamePresent?: boolean; tableName?: string | null; expectedKeySchema?: string; region?: string };
 };
 
 function MetricCard({ label, today, last7Days, last30Days }: { label: string; today: number; last7Days: number; last30Days: number }) {
@@ -39,7 +40,7 @@ function MetricCard({ label, today, last7Days, last30Days }: { label: string; to
 export default function AdminAnalyticsPage() {
   const [status, setStatus] = useState<"loading" | "loaded" | "empty" | "error">("loading");
   const [data, setData] = useState<AnalyticsPayload | null>(null);
-  const [error, setError] = useState<{ status: number; message: string; errorCode?: string } | null>(null);
+  const [error, setError] = useState<{ status: number; message: string; errorCode?: string; awsErrorName?: string; diagnostics?: AnalyticsErrorPayload["diagnostics"] } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -67,6 +68,8 @@ export default function AdminAnalyticsPage() {
             status: res.status,
             message: p?.message || "Unable to load analytics.",
             errorCode: p?.errorCode,
+            awsErrorName: p?.awsErrorName,
+            diagnostics: p?.diagnostics,
           });
           setStatus("error");
           return;
@@ -105,6 +108,15 @@ export default function AdminAnalyticsPage() {
           <p className="text-sm text-red-800">HTTP status: {error?.status ?? 0}</p>
           <p className="text-sm text-red-800">Message: {error?.message || "Unable to load analytics."}</p>
           {error?.errorCode && <p className="text-sm text-red-800">Code: {error.errorCode}</p>}
+          {error?.awsErrorName && <p className="text-sm text-red-800">AWS error: {error.awsErrorName}</p>}
+          {error?.diagnostics && (
+            <div className="text-sm text-red-800">
+              <p>Diagnostics: tableConfigured={String(error.diagnostics.tableConfigured)}, tableNamePresent={String(error.diagnostics.tableNamePresent)}</p>
+              {error.diagnostics.tableName ? <p>Table: {error.diagnostics.tableName}</p> : null}
+              {error.diagnostics.expectedKeySchema ? <p>Expected schema: {error.diagnostics.expectedKeySchema}</p> : null}
+              {error.diagnostics.region ? <p>Region: {error.diagnostics.region}</p> : null}
+            </div>
+          )}
           {error?.errorCode === "ANALYTICS_NOT_CONFIGURED" && (
             <div className="mt-3 rounded-lg border border-red-200 bg-white p-3 text-sm text-red-900">
               <p>Analytics is not configured. Add <code>DDB_TABLE_ANALYTICS_EVENTS</code> to Amplify environment variables and redeploy.</p>

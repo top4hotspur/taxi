@@ -186,6 +186,11 @@ CloudWatch correlation troubleshooting:
 - Events are captured via `POST /api/analytics/event`.
 - Raw IP addresses are not stored; an `ipHash` is stored using `ANALYTICS_SALT` (or `SESSION_SECRET` fallback).
 - Admin analytics dashboard is available at `/admin/analytics`.
+- Required env var:
+  - `DDB_TABLE_ANALYTICS_EVENTS=ni-taxi-analytics-events`
+- Required DynamoDB schema for analytics table:
+  - Partition key: `day` (String)
+  - Sort key: `createdAtEventId` (String)
 - Current funnel events:
   - `PAGE_VIEW`
   - `QUOTE_STARTED`

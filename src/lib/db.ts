@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { DescribeTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
 const appAccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID?.trim();
@@ -217,6 +217,8 @@ export interface PricingDateUpliftRecord {
 }
 
 export interface AnalyticsEventRecord {
+  day: string;
+  createdAtEventId: string;
   eventId: string;
   eventType:
     | "PAGE_VIEW"
@@ -769,14 +771,25 @@ export const db = {
     return records;
   },
 
-  async createAnalyticsEvent(event: Omit<AnalyticsEventRecord, "eventId" | "createdAt"> & { eventId?: string }, options?: { correlationId?: string }) {
+  async createAnalyticsEvent(
+    event: Omit<AnalyticsEventRecord, "eventId" | "createdAt" | "day" | "createdAtEventId"> & {
+      eventId?: string;
+      createdAt?: string;
+    },
+    options?: { correlationId?: string }
+  ) {
     if (!TABLE_ANALYTICS_EVENTS) {
       throw new DbConfigMissingError(["DDB_TABLE_ANALYTICS_EVENTS"]);
     }
+    const eventIdValue = event.eventId || id();
+    const createdAtValue = event.createdAt || now();
+    const dayValue = createdAtValue.slice(0, 10);
     const record: AnalyticsEventRecord = {
       ...event,
-      eventId: event.eventId || id(),
-      createdAt: now(),
+      day: dayValue,
+      createdAtEventId: `${createdAtValue}#${eventIdValue}`,
+      eventId: eventIdValue,
+      createdAt: createdAtValue,
     };
     await putWithDiagnostics(record, {
       correlationId: options?.correlationId,
@@ -793,6 +806,26 @@ export const db = {
     }
     const result = await ddb.send(new ScanCommand({ TableName: TABLE_ANALYTICS_EVENTS }));
     return ((result.Items as AnalyticsEventRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  async listAnalyticsEventsByDays(days: string[]) {
+    if (!TABLE_ANALYTICS_EVENTS) {
+      throw new DbConfigMissingError(["DDB_TABLE_ANALYTICS_EVENTS"]);
+    }
+    const allResults = await Promise.all(
+      days.map(async (day) => {
+        const result = await ddb.send(
+          new QueryCommand({
+            TableName: TABLE_ANALYTICS_EVENTS,
+            KeyConditionExpression: "#day = :day",
+            ExpressionAttributeNames: { "#day": "day" },
+            ExpressionAttributeValues: { ":day": day },
+          })
+        );
+        return (result.Items as AnalyticsEventRecord[] | undefined) || [];
+      })
+    );
+    return allResults.flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
   async listCustomers() {
