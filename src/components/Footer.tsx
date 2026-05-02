@@ -8,15 +8,13 @@ export default function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
         <div>
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 p-1.5">
-              <Image
-                src={siteConfig.logoPath}
-                alt={`${siteConfig.name} logo`}
-                width={40}
-                height={40}
-                className="h-10 w-10 object-contain"
-              />
-            </span>
+            <Image
+              src={siteConfig.logoPath}
+              alt={`${siteConfig.name} logo`}
+              width={40}
+              height={40}
+              className="h-10 w-10 object-contain"
+            />
             <h2 className="text-lg font-semibold text-slate-900">{siteConfig.name}</h2>
           </div>
           <p className="mt-3 text-sm text-slate-600">Northern Ireland private hire / taxi booking enquiries</p>

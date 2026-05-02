@@ -99,16 +99,14 @@ export default function Header() {
           onClick={closeMobileMenu}
           aria-label={siteConfig.name}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-sm">
-            <Image
-              src={siteConfig.logoPath}
-              alt={`${siteConfig.name} logo`}
-              width={32}
-              height={32}
-              className="h-8 w-8 object-contain"
-              priority
-            />
-          </span>
+          <Image
+            src={siteConfig.logoPath}
+            alt={`${siteConfig.name} logo`}
+            width={36}
+            height={36}
+            className="h-9 w-9 object-contain"
+            priority
+          />
           <span className="text-lg font-semibold tracking-wide sm:text-xl">{siteConfig.name}</span>
         </Link>
 
