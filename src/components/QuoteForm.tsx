@@ -1,11 +1,12 @@
-"use client";
+﻿"use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import PlaceAutocompleteInput from "@/components/PlaceAutocompleteInput";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
 
-const serviceTypes = ["Airport transfer", "Golf transfer", "Tourist day trip", "Event transport", "Cruise/tour operator transport", "Corporate transfer", "Other"];
+const serviceTypes = ["Airport Transfer", "Golf Transfer", "Tourist Day Trip", "Event Transport", "Other"];
 const pricingRelevantFields = new Set([
   "pickupLocation", "dropoffLocation", "pickupDate", "pickupTime", "passengers", "returnJourney",
   "returnPickupLocation", "returnDropoffLocation", "returnDate", "returnTime", "handLuggageCount", "suitcaseCount", "oversizeItemCount", "serviceType",
@@ -28,6 +29,7 @@ type EstimateResponse = {
   routeEstimateFailed?: boolean;
   routeEstimateFailureReason?: string | null;
   customerMessage?: string;
+  manualGroupQuote?: boolean;
 };
 
 export default function QuoteForm() {
@@ -40,6 +42,7 @@ export default function QuoteForm() {
   const [estimate, setEstimate] = useState<EstimateResponse | null>(null);
   const [estimateStale, setEstimateStale] = useState(false);
   const [returnJourneyNeeded, setReturnJourneyNeeded] = useState(false);
+  const [leadPassengerSameAsBooker, setLeadPassengerSameAsBooker] = useState(true);
   const [formState, setFormState] = useState<Record<string, string>>({});
   const [customerContext, setCustomerContext] = useState({ loggedInCustomer: false, email: "", name: "", phone: "" });
 
@@ -127,7 +130,9 @@ export default function QuoteForm() {
       setEstimate(result);
       setEstimateStale(false);
       trackAnalyticsEvent("QUOTE_ESTIMATE_RECALCULATED", "/quote");
-      if (result.routeEstimateFailed) {
+      if (result.manualGroupQuote) {
+        setEstimateError(result.customerMessage || "We can't estimate prices online for groups larger than 8 passengers. Please submit your request and we'll be in touch shortly with a tailored quote.");
+      } else if (result.routeEstimateFailed) {
         setEstimateError(result.customerMessage || "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.");
       }
     } catch {
@@ -150,6 +155,10 @@ export default function QuoteForm() {
       phone: customerContext.loggedInCustomer ? customerContext.phone || String(fd.get("phone") || "") : String(fd.get("phone") || ""),
       passengerName: String(fd.get("passengerName") || ""),
       passengerPhone: String(fd.get("passengerPhone") || ""),
+      leadPassengerSameAsBooker,
+      leadPassengerName: leadPassengerSameAsBooker ? "" : String(fd.get("leadPassengerName") || ""),
+      leadPassengerEmail: leadPassengerSameAsBooker ? "" : String(fd.get("leadPassengerEmail") || ""),
+      leadPassengerPhone: leadPassengerSameAsBooker ? "" : String(fd.get("leadPassengerPhone") || ""),
       accountType: String(fd.get("accountType") || "PERSONAL"),
       serviceType: String(fd.get("serviceType") || ""),
       pickupLocation: String(fd.get("pickupLocation") || ""),
@@ -198,6 +207,8 @@ export default function QuoteForm() {
       pricingCalculatedAt: estimate ? new Date().toISOString() : "",
       routeEstimateFailed: Boolean(estimate?.routeEstimateFailed || estimateStale),
       routeEstimateFailureReason: String(estimateStale ? "Journey details changed after estimate." : estimate?.routeEstimateFailureReason || ""),
+      termsAccepted: String(fd.get("termsAccepted") || "").toLowerCase() === "true",
+      policyVersion: "v1-2026-05",
     };
     try {
       const response = await fetch("/api/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -224,6 +235,7 @@ export default function QuoteForm() {
         const target = event.target;
         if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
         if (target.name === "returnJourney") setReturnJourneyNeeded(target.value === "Yes");
+        if (target.name === "leadPassengerSameAsBooker") setLeadPassengerSameAsBooker(target.value === "Yes");
         if (target.name) {
           markPotentiallyStale(target.name);
           setFormState((current) => ({ ...current, [target.name]: target.value }));
@@ -239,15 +251,14 @@ export default function QuoteForm() {
             <p>{customerContext.email}</p>
             <p>{customerContext.phone}</p>
           </article>
-        ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {showNameField && <InputField label="Booker name" name="name" required />}
-            {showEmailField && <InputField label="Booker email" name="email" type="email" required />}
-            {showPhoneField && <InputField label="Booker phone / WhatsApp" name="phone" required />}
-            <InputField label="Passenger name (if different)" name="passengerName" />
-            <InputField label="Passenger phone (if different)" name="passengerPhone" />
-          </div>
-        )}
+        ) : null}
+        <div className="grid gap-5 sm:grid-cols-2">
+          {showNameField && <InputField label="Booker name" name="name" required />}
+          {showEmailField && <InputField label="Booker email" name="email" type="email" required />}
+          {showPhoneField && <InputField label="Booker phone / WhatsApp" name="phone" required />}
+          <InputField label="Passenger name (if different)" name="passengerName" />
+          <InputField label="Passenger phone (if different)" name="passengerPhone" />
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -266,7 +277,7 @@ export default function QuoteForm() {
       {returnJourneyNeeded && (
         <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <h2 className="text-lg font-semibold text-slate-900">Return journey</h2>
-          <p className="text-sm text-slate-600">We’ll pre-fill the return route as the reverse of your outward journey. You can change it if needed.</p>
+          <p className="text-sm text-slate-600">We&apos;ll pre-fill the return route as the reverse of your outward journey. You can change it if needed.</p>
           <button type="button" onClick={resetReturnToReverse} className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100">Reset to reverse outward route</button>
           <div className="grid gap-5 sm:grid-cols-2">
             <PlaceAutocompleteInput label="Return pickup location" required locationNameField="returnPickupLocation" placeIdField="returnPickupPlaceId" addressField="returnPickupAddress" latField="returnPickupLat" lngField="returnPickupLng" defaultValueFieldName="dropoffLocation" />
@@ -288,6 +299,16 @@ export default function QuoteForm() {
             <p className="mt-1 text-xs text-slate-500">For example golf clubs, skis, large boxes or mobility equipment.</p>
           </div>
         </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <SelectField label="Is the lead passenger the same person as the booker?" name="leadPassengerSameAsBooker" options={["Yes", "No"]} required />
+          {!leadPassengerSameAsBooker ? (
+            <>
+              <InputField label="Lead passenger name" name="leadPassengerName" required />
+              <InputField label="Lead passenger email address" name="leadPassengerEmail" type="email" required />
+              <InputField label="Lead passenger phone number" name="leadPassengerPhone" required />
+            </>
+          ) : null}
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -307,7 +328,9 @@ export default function QuoteForm() {
         {estimateError && <p className="text-sm text-red-700">{estimateError}</p>}
         {estimate?.ok && (
           <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-slate-900">
-            {returnJourneyNeeded ? (
+            {estimate.manualGroupQuote ? (
+              <p className="font-medium text-amber-900">We can&apos;t estimate prices online for groups larger than 8 passengers. Please submit your request and we&apos;ll be in touch shortly with a tailored quote.</p>
+            ) : returnJourneyNeeded ? (
               <>
                 <p className="text-lg font-semibold">Estimated return fare: {estimate.finalEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
                 <p>Outward journey: {estimate.outwardEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
@@ -319,15 +342,22 @@ export default function QuoteForm() {
                 <p className="text-lg font-semibold">Estimated fare: {estimate.finalEstimatedFare ?? estimate.estimatedFare ?? "N/A"} {estimate.currency || ""}</p>
                 <p>Distance: {estimate.distanceMiles ?? "N/A"} {estimate.distanceMiles !== null && estimate.distanceMiles !== undefined ? "miles" : ""}</p>
                 <p>Journey time: {estimate.durationMinutes ?? "N/A"} {estimate.durationMinutes !== null && estimate.durationMinutes !== undefined ? "minutes" : ""}</p>
+                <p>{estimate.fareBreakdown?.["airportSurchargeApplied"] ? "Airport surcharge included." : ""}</p>
+                <p>{estimate.fareBreakdown?.["passengerUpliftPercent"] ? "Passenger uplift included." : ""}</p>
               </>
             )}
-            <details className="mt-2">
-              <summary className="cursor-pointer text-sm font-medium text-slate-800">View fare breakdown</summary>
-              <pre className="mt-2 overflow-x-auto rounded bg-white p-2 text-xs text-slate-700">{JSON.stringify(estimate.fareBreakdown || {}, null, 2)}</pre>
-            </details>
             <p className="mt-2 text-slate-700">Subject to driver availability and final confirmation.</p>
           </article>
         )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <label className="flex items-start gap-3 text-sm text-slate-800">
+          <input type="checkbox" name="termsAccepted" value="true" required className="mt-1 h-4 w-4 rounded border-slate-300" />
+          <span>
+            I have read and agree to the <Link href="/terms" className="font-semibold underline" target="_blank">Terms &amp; Conditions</Link> and <Link href="/policies" className="font-semibold underline" target="_blank">Policies</Link>.
+          </span>
+        </label>
       </section>
 
       <button type="submit" disabled={status === "loading"} className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500">
@@ -351,8 +381,8 @@ function SelectField({ label, name, options, required }: { label: string; name: 
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor={name}>{label}</label>
-      <select id={name} name={name} required={required} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2">
-        <option value="">Select an option</option>
+      <select id={name} name={name} required={required} defaultValue={options[0] === "No" || options[0] === "Yes" ? options[0] : ""} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2">
+        {options[0] !== "No" && options[0] !== "Yes" ? <option value="">Select an option</option> : null}
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
     </div>

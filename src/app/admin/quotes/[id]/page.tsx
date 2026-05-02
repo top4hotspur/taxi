@@ -19,6 +19,10 @@ type Quote = {
   guestPhone?: string;
   passengerName?: string;
   passengerPhone?: string;
+  leadPassengerSameAsBooker?: boolean;
+  leadPassengerName?: string;
+  leadPassengerEmail?: string;
+  leadPassengerPhone?: string;
   pickupLocation: string;
   pickupPlaceId?: string;
   pickupAddress?: string;
@@ -59,6 +63,9 @@ type Quote = {
   pricingCalculatedAt?: string;
   routeEstimateFailed?: boolean;
   routeEstimateFailureReason?: string;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string;
+  policyVersion?: string;
   audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>;
 };
 
@@ -135,6 +142,14 @@ export default function AdminQuoteDetailPage() {
         <p>Phone: {quote.guestPhone || "Not provided"}</p>
         <p>Passenger name: {quote.passengerName || "Same as booker / not provided"}</p>
         <p>Passenger phone: {quote.passengerPhone || "Same as booker / not provided"}</p>
+        <p>Lead passenger same as booker: {quote.leadPassengerSameAsBooker === false ? "No" : "Yes"}</p>
+        {quote.leadPassengerSameAsBooker === false ? (
+          <>
+            <p>Lead passenger name: {quote.leadPassengerName || "Not provided"}</p>
+            <p>Lead passenger email: {quote.leadPassengerEmail || "Not provided"}</p>
+            <p>Lead passenger phone: {quote.leadPassengerPhone || "Not provided"}</p>
+          </>
+        ) : null}
         <p>Service: {quote.serviceType}</p>
         <p>Date/Time: {quote.pickupDate} {quote.pickupTime}</p>
         <p>Passengers: {quote.passengers}</p>
@@ -168,9 +183,13 @@ export default function AdminQuoteDetailPage() {
         <p>Estimated distance: {quote.estimatedDistanceMiles !== undefined ? `${quote.estimatedDistanceMiles} miles` : "Not available"}</p>
         <p>Estimated duration: {quote.estimatedDurationMinutes !== undefined ? `${quote.estimatedDurationMinutes} minutes` : "Not available"}</p>
         <p>Requires manual review: {quote.requiresManualReview ? "Yes" : "No"}</p>
+        <p>Manual group quote: {quote.pricingSource === "MANUAL_GROUP_QUOTE" ? "Yes" : "No"}</p>
         <p>Route estimate failed: {quote.routeEstimateFailed ? "Yes" : "No"}</p>
         <p>Route estimate failure reason: {quote.routeEstimateFailureReason || "None"}</p>
         <p>Pricing calculated at: {quote.pricingCalculatedAt || "Not available"}</p>
+        <p>Terms accepted: {quote.termsAccepted ? "Yes" : "No"}</p>
+        <p>Terms accepted at: {quote.termsAcceptedAt || "Not provided"}</p>
+        <p>Policy version: {quote.policyVersion || "Not provided"}</p>
         {parsedFareBreakdown ? (
           <div>
             <p>Fare breakdown:</p>

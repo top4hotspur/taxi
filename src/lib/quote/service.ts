@@ -22,6 +22,10 @@ export interface CreateQuoteInput {
   guestPhone?: string;
   passengerName?: string;
   passengerPhone?: string;
+  leadPassengerSameAsBooker?: boolean;
+  leadPassengerName?: string;
+  leadPassengerEmail?: string;
+  leadPassengerPhone?: string;
   accountType: AccountTypeValue;
   serviceType: string;
   pickupLocation: string;
@@ -72,6 +76,9 @@ export interface CreateQuoteInput {
   pricingCalculatedAt?: string;
   routeEstimateFailed?: boolean;
   routeEstimateFailureReason?: string;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string;
+  policyVersion?: string;
 }
 
 export interface QuoteNotificationOutcome {
@@ -101,6 +108,10 @@ export async function createQuote(input: CreateQuoteInput) {
     guestPhone: input.guestPhone,
     passengerName: input.passengerName,
     passengerPhone: input.passengerPhone,
+    leadPassengerSameAsBooker: input.leadPassengerSameAsBooker,
+    leadPassengerName: input.leadPassengerName,
+    leadPassengerEmail: input.leadPassengerEmail,
+    leadPassengerPhone: input.leadPassengerPhone,
     accountType: input.accountType,
     serviceType: input.serviceType,
     pickupLocation: input.pickupLocation,
@@ -151,6 +162,9 @@ export async function createQuote(input: CreateQuoteInput) {
     pricingCalculatedAt: input.pricingCalculatedAt,
     routeEstimateFailed: input.routeEstimateFailed,
     routeEstimateFailureReason: input.routeEstimateFailureReason,
+    termsAccepted: input.termsAccepted,
+    termsAcceptedAt: input.termsAcceptedAt,
+    policyVersion: input.policyVersion,
     quotedCurrency: "GBP",
     status: "SUBMITTED",
   }, { correlationId: input.correlationId });

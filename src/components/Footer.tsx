@@ -33,6 +33,16 @@ export default function Footer() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link href="/terms" className="text-sm text-slate-600 hover:text-slate-900">
+                Terms &amp; Conditions
+              </Link>
+            </li>
+            <li>
+              <Link href="/policies" className="text-sm text-slate-600 hover:text-slate-900">
+                Policies
+              </Link>
+            </li>
           </ul>
         </div>
 

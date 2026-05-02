@@ -16,6 +16,31 @@ export async function POST(request: Request) {
     const oversizeItemCount = Number(body.oversizeItemCount || 0);
     const pickupDate = String(body.pickupDate || "");
     const pickupTime = String(body.pickupTime || "");
+    if (Number.isFinite(passengers) && passengers > 8) {
+      return NextResponse.json(
+        {
+          ok: true,
+          estimatedFare: null,
+          finalEstimatedFare: null,
+          outwardEstimatedFare: null,
+          returnEstimatedFare: null,
+          returnDiscountPercent: null,
+          returnDiscountAmount: null,
+          currency: "GBP",
+          distanceMiles: null,
+          durationMinutes: null,
+          fareBreakdown: null,
+          pricingSource: "MANUAL_GROUP_QUOTE",
+          requiresManualReview: true,
+          routeEstimateFailed: false,
+          routeEstimateFailureReason: null,
+          customerMessage: "We can't estimate prices online for groups larger than 8 passengers. Please submit your request and we'll be in touch shortly with a tailored quote.",
+          manualGroupQuote: true,
+          errorCode: "MANUAL_GROUP_QUOTE",
+        },
+        { status: 200 }
+      );
+    }
 
     const pickupLocation = String(body.pickupLocation || "").trim();
     const dropoffLocation = String(body.dropoffLocation || "").trim();

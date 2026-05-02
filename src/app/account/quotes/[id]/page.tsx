@@ -24,6 +24,10 @@ type Quote = {
   suitcaseCount?: number;
   oversizeItemCount?: number;
   itineraryMessage?: string;
+  leadPassengerSameAsBooker?: boolean;
+  leadPassengerName?: string;
+  leadPassengerEmail?: string;
+  leadPassengerPhone?: string;
   estimatedFare?: number;
   finalEstimatedFare?: number;
   estimatedCurrency?: string;
@@ -31,6 +35,7 @@ type Quote = {
   quotedPrice?: number;
   quotedCurrency?: string;
   adminCustomerMessage?: string;
+  termsAccepted?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -57,13 +62,6 @@ export default function AccountQuoteDetail() {
   if (error) return <p className="text-red-700">{error}</p>;
   if (!quote) return <p>Loading...</p>;
 
-  let breakdown: Record<string, unknown> | null = null;
-  try {
-    breakdown = quote.estimatedFareBreakdown ? (JSON.parse(quote.estimatedFareBreakdown) as Record<string, unknown>) : null;
-  } catch {
-    breakdown = null;
-  }
-
   return (
     <section className="space-y-5">
       <h1 className="text-3xl font-bold">Quote details</h1>
@@ -83,20 +81,23 @@ export default function AccountQuoteDetail() {
         <p><strong>Suitcases:</strong> {quote.suitcaseCount ?? 0}</p>
         <p><strong>Oversize items:</strong> {quote.oversizeItemCount ?? 0}</p>
         <p><strong>Special requests:</strong> {quote.itineraryMessage || "None"}</p>
+        <p><strong>Lead passenger same as booker:</strong> {quote.leadPassengerSameAsBooker === false ? "No" : "Yes"}</p>
+        {quote.leadPassengerSameAsBooker === false ? (
+          <>
+            <p><strong>Lead passenger name:</strong> {quote.leadPassengerName || "Not provided"}</p>
+            <p><strong>Lead passenger email:</strong> {quote.leadPassengerEmail || "Not provided"}</p>
+            <p><strong>Lead passenger phone:</strong> {quote.leadPassengerPhone || "Not provided"}</p>
+          </>
+        ) : null}
         <p><strong>Estimated fare:</strong> {(quote.finalEstimatedFare ?? quote.estimatedFare) ? `${quote.finalEstimatedFare ?? quote.estimatedFare} ${quote.estimatedCurrency || "GBP"}` : "Manual review required"}</p>
         {quote.quotedPrice !== undefined && quote.quotedPrice !== null && (
           <p><strong>Confirmed quote:</strong> {quote.quotedPrice} {quote.quotedCurrency || "GBP"}</p>
         )}
         {quote.adminCustomerMessage && <p><strong>Message from NI Taxi Co:</strong> {quote.adminCustomerMessage}</p>}
+        <p><strong>Terms accepted:</strong> {quote.termsAccepted ? "Yes" : "No"}</p>
         <p><strong>Created:</strong> {new Date(quote.createdAt).toLocaleString()}</p>
         <p><strong>Updated:</strong> {new Date(quote.updatedAt).toLocaleString()}</p>
       </article>
-      {breakdown && (
-        <article className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-lg font-semibold">Estimate breakdown</h2>
-          <pre className="mt-3 overflow-x-auto rounded bg-slate-50 p-3 text-xs text-slate-700">{JSON.stringify(breakdown, null, 2)}</pre>
-        </article>
-      )}
     </section>
   );
 }

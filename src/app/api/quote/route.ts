@@ -74,6 +74,22 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const termsAccepted = String(payload.termsAccepted || "").toLowerCase() === "true";
+    if (!termsAccepted) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_FAILED",
+          error: "You must accept Terms & Conditions and Policies before submitting.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 400 }
+      );
+    }
+    const leadPassengerSameAsBooker = String(payload.leadPassengerSameAsBooker || "true").toLowerCase() !== "false";
 
     const result = await createQuote({
       correlationId,
@@ -83,6 +99,10 @@ export async function POST(request: Request) {
       guestPhone: session ? undefined : String(payload.phone),
       passengerName: String(payload.passengerName || "") || undefined,
       passengerPhone: String(payload.passengerPhone || "") || undefined,
+      leadPassengerSameAsBooker,
+      leadPassengerName: leadPassengerSameAsBooker ? undefined : String(payload.leadPassengerName || "") || undefined,
+      leadPassengerEmail: leadPassengerSameAsBooker ? undefined : String(payload.leadPassengerEmail || "") || undefined,
+      leadPassengerPhone: leadPassengerSameAsBooker ? undefined : String(payload.leadPassengerPhone || "") || undefined,
       accountType: String(payload.accountType || "PERSONAL") === "BUSINESS" ? "BUSINESS" : "PERSONAL",
       serviceType: String(payload.serviceType),
       pickupLocation: String(payload.pickupLocation),
@@ -128,11 +148,16 @@ export async function POST(request: Request) {
       estimatedDistanceMiles: Number.isFinite(estimatedDistanceMiles) ? estimatedDistanceMiles : undefined,
       estimatedDurationMinutes: Number.isFinite(estimatedDurationMinutes) ? estimatedDurationMinutes : undefined,
       estimatedFareBreakdown: String(payload.estimatedFareBreakdown || "") || undefined,
-      pricingSource: String(payload.pricingSource || "") || undefined,
-      requiresManualReview: String(payload.requiresManualReview || "").toLowerCase() === "true",
+      pricingSource: passengers > 8 ? "MANUAL_GROUP_QUOTE" : String(payload.pricingSource || "") || undefined,
+      requiresManualReview: passengers > 8 || String(payload.requiresManualReview || "").toLowerCase() === "true",
       pricingCalculatedAt: String(payload.pricingCalculatedAt || "") || undefined,
-      routeEstimateFailed: String(payload.routeEstimateFailed || "").toLowerCase() === "true",
-      routeEstimateFailureReason: String(payload.routeEstimateFailureReason || "") || undefined,
+      routeEstimateFailed: passengers > 8 ? false : String(payload.routeEstimateFailed || "").toLowerCase() === "true",
+      routeEstimateFailureReason: passengers > 8
+        ? "Manual group quote required for more than 8 passengers."
+        : String(payload.routeEstimateFailureReason || "") || undefined,
+      termsAccepted,
+      termsAcceptedAt: new Date().toISOString(),
+      policyVersion: String(payload.policyVersion || "v1-2026-05"),
     });
 
     quoteSaved = true;

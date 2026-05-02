@@ -64,6 +64,10 @@ export interface QuoteRecord {
   guestPhone?: string;
   passengerName?: string;
   passengerPhone?: string;
+  leadPassengerSameAsBooker?: boolean;
+  leadPassengerName?: string;
+  leadPassengerEmail?: string;
+  leadPassengerPhone?: string;
   accountType: string;
   serviceType: string;
   pickupLocation: string;
@@ -118,6 +122,9 @@ export interface QuoteRecord {
   pricingCalculatedAt?: string;
   routeEstimateFailed?: boolean;
   routeEstimateFailureReason?: string;
+  termsAccepted?: boolean;
+  termsAcceptedAt?: string;
+  policyVersion?: string;
   status: string;
   createdAt: string;
   updatedAt: string;
