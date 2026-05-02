@@ -23,6 +23,13 @@ export const metadata: Metadata = {
     template: "%s | NI Taxi Co",
   },
   description: siteConfig.description,
+  icons: {
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
