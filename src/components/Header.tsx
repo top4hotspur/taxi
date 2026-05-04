@@ -37,20 +37,7 @@ export default function Header() {
   const [customerOpen, setCustomerOpen] = useState(false);
   const [driverOpen, setDriverOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState<null | "services" | "customer" | "driver">(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const desktopNavRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data = (await res.json()) as { isAdmin?: boolean };
-        setIsAdmin(Boolean(data.isAdmin));
-      })
-      .catch(() => {
-        setIsAdmin(false);
-      });
-  }, []);
 
   useEffect(() => {
     const onMouseDown = (event: MouseEvent) => {
@@ -215,11 +202,6 @@ export default function Header() {
                 </div>
               )}
             </div>
-            {isAdmin && (
-              <Link href="/admin" className={`text-sm font-medium transition ${isActive(pathname, "/admin") ? "text-amber-300" : "text-slate-200 hover:text-white"}`} onClick={closeDesktopMenu}>
-                Admin
-              </Link>
-            )}
           </div>
         </nav>
       </div>
@@ -273,11 +255,6 @@ export default function Header() {
               </div>
             )}
 
-            {isAdmin && (
-              <Link href="/admin" className={`rounded px-2 py-2 text-sm font-medium ${isActive(pathname, "/admin") ? "bg-slate-800 text-amber-300" : "text-slate-200"}`} onClick={closeMobileMenu}>
-                Admin
-              </Link>
-            )}
           </div>
         </nav>
       )}

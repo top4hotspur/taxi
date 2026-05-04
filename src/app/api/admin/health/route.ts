@@ -59,6 +59,7 @@ export async function GET() {
     effectiveRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim()),
     appAwsAccessKeyIdPresent: Boolean(process.env.APP_AWS_ACCESS_KEY_ID?.trim()),
     appAwsSecretAccessKeyPresent: Boolean(process.env.APP_AWS_SECRET_ACCESS_KEY?.trim()),
+    adminEmailPresent: Boolean(process.env.ADMIN_EMAIL?.trim()),
     ddbTables,
     ddbTableChecks,
     analyticsTableEnvPresent: Boolean(process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()),

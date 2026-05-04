@@ -43,6 +43,11 @@ export default function Footer() {
                 Policies
               </Link>
             </li>
+            <li>
+              <Link href="/admin" className="text-sm text-slate-600 hover:text-slate-900">
+                Admin Login
+              </Link>
+            </li>
           </ul>
         </div>
 
