@@ -29,7 +29,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
-  const body = (await request.json()) as { adminNotes?: string; adminCustomerMessage?: string; quotedPrice?: number; quotedCurrency?: string; status?: QuoteStatusValue; action?: "mark_awaiting" | "mark_quoted" | "mark_accepted" | "mark_declined" | "mark_cancelled"; note?: string; };
+  const body = (await request.json()) as { adminNotes?: string; adminCustomerMessage?: string; quotedPrice?: number; quotedCurrency?: string; status?: QuoteStatusValue; action?: "mark_awaiting" | "mark_quoted" | "mark_payment_required" | "mark_accepted" | "mark_declined" | "mark_cancelled"; note?: string; };
 
   const quote = await db.findQuoteById(id);
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
@@ -37,15 +37,26 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   let nextStatus = body.status;
   if (body.action === "mark_awaiting") nextStatus = "AWAITING_CONFIRMATION";
   if (body.action === "mark_quoted") nextStatus = "QUOTED";
+  if (body.action === "mark_payment_required") nextStatus = "QUOTED";
   if (body.action === "mark_accepted") nextStatus = "ACCEPTED";
   if (body.action === "mark_declined") nextStatus = "DECLINED";
   if (body.action === "mark_cancelled") nextStatus = "CANCELLED";
 
+  const nextQuotedPrice = body.quotedPrice !== undefined ? Number(body.quotedPrice) : quote.quotedPrice;
+  const nextCurrency = body.quotedCurrency || quote.quotedCurrency || "GBP";
+  const shouldEnablePayment = nextStatus === "QUOTED" || body.action === "mark_payment_required";
+  if (shouldEnablePayment && (!Number.isFinite(Number(nextQuotedPrice)) || Number(nextQuotedPrice) <= 0)) {
+    return NextResponse.json({ success: false, message: "Confirmed quote price is required before requesting payment." }, { status: 400 });
+  }
+
   const updated = await db.updateQuote(id, {
     adminNotes: body.adminNotes ?? quote.adminNotes,
     adminCustomerMessage: body.adminCustomerMessage ?? quote.adminCustomerMessage,
-    quotedPrice: body.quotedPrice !== undefined ? Number(body.quotedPrice) : quote.quotedPrice,
-    quotedCurrency: body.quotedCurrency || quote.quotedCurrency,
+    quotedPrice: nextQuotedPrice,
+    quotedCurrency: nextCurrency,
+    confirmedPrice: Number.isFinite(Number(nextQuotedPrice)) ? Number(nextQuotedPrice) : quote.confirmedPrice,
+    confirmedCurrency: nextCurrency,
+    paymentStatus: shouldEnablePayment ? "PAYMENT_REQUIRED" : (quote.paymentStatus || "NOT_REQUIRED"),
     status: nextStatus ? normalizeQuoteStatus(nextStatus) : quote.status,
   });
 

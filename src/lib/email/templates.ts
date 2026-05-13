@@ -112,6 +112,25 @@ export function adminBookingConfirmedEmail(quote: QuoteRecord) {
   };
 }
 
+export function customerPaymentConfirmedEmail(quote: QuoteRecord, isGuest: boolean) {
+  const amount = quote.paymentAmount ?? quote.confirmedPrice ?? quote.quotedPrice ?? 0;
+  const currency = quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP";
+  const track = isGuest ? "Reply to this email for any booking updates." : `View quote details: ${siteUrl}/account/quotes/${quote.id}`;
+  return {
+    subject: `Payment received (${quote.id})`,
+    text: `Thank you. We have received your payment.\n\nPaid amount: ${currency} ${amount}\nQuote reference: ${quote.id}\nJourney: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\nWe'll confirm final booking/driver details shortly.\n\n${track}\n\n${emailFooter()}`,
+  };
+}
+
+export function adminPaymentReceivedEmail(quote: QuoteRecord) {
+  const amount = quote.paymentAmount ?? quote.confirmedPrice ?? quote.quotedPrice ?? 0;
+  const currency = quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP";
+  return {
+    subject: `Payment received for quote ${quote.id}`,
+    text: `A customer payment has been received.\n\nQuote ID: ${quote.id}\nAmount: ${currency} ${amount}\nSquare payment ID: ${quote.squarePaymentId || "N/A"}\nRoute: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\n${emailFooter()}`,
+  };
+}
+
 export function driverMissingComplianceReminderEmail(params: {
   driverName: string;
   missingProfileFields: string[];

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getQuoteStatusLabel } from "@/lib/quote/constants";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
+import SquarePayQuoteForm from "@/components/SquarePayQuoteForm";
 
 type Quote = {
   id: string;
@@ -34,6 +35,15 @@ type Quote = {
   estimatedFareBreakdown?: string;
   quotedPrice?: number;
   quotedCurrency?: string;
+  confirmedPrice?: number;
+  confirmedCurrency?: string;
+  paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
+  paymentProvider?: "SQUARE";
+  squarePaymentId?: string;
+  paidAt?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
+  paymentFailureReason?: string;
   adminCustomerMessage?: string;
   termsAccepted?: boolean;
   createdAt: string;
@@ -46,21 +56,30 @@ export default function AccountQuoteDetail() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const id = params.id;
-    if (!id) return;
-    trackAnalyticsEvent("ACCOUNT_QUOTE_DETAIL_VIEWED", `/account/quotes/${id}`);
-    fetch(`/api/account/quotes/${id}`, { cache: "no-store" }).then(async (res) => {
+    async function loadQuote() {
+      const id = params.id;
+      if (!id) return;
+      const res = await fetch(`/api/account/quotes/${id}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Unable to load quote.");
         return;
       }
       setQuote(data.quote as Quote);
-    }).catch(() => setError("Unable to load quote."));
+    }
+
+    const id = params.id;
+    if (!id) return;
+    trackAnalyticsEvent("ACCOUNT_QUOTE_DETAIL_VIEWED", `/account/quotes/${id}`);
+    loadQuote().catch(() => setError("Unable to load quote."));
   }, [params.id]);
 
   if (error) return <p className="text-red-700">{error}</p>;
   if (!quote) return <p>Loading...</p>;
+  const confirmedAmount = Number(quote.confirmedPrice ?? quote.quotedPrice);
+  const confirmedCurrency = quote.confirmedCurrency || quote.quotedCurrency || "GBP";
+  const paymentReady = Number.isFinite(confirmedAmount) && confirmedAmount > 0 && quote.paymentStatus === "PAYMENT_REQUIRED";
+  const isPaid = quote.paymentStatus === "PAID";
 
   return (
     <section className="space-y-5">
@@ -93,11 +112,42 @@ export default function AccountQuoteDetail() {
         {quote.quotedPrice !== undefined && quote.quotedPrice !== null && (
           <p><strong>Confirmed quote:</strong> {quote.quotedPrice} {quote.quotedCurrency || "GBP"}</p>
         )}
+        <p><strong>Payment status:</strong> {quote.paymentStatus || "NOT_REQUIRED"}</p>
+        {isPaid ? (
+          <>
+            <p><strong>Paid amount:</strong> {(quote.paymentAmount ?? confirmedAmount).toFixed(2)} {quote.paymentCurrency || confirmedCurrency}</p>
+            <p><strong>Paid at:</strong> {quote.paidAt ? new Date(quote.paidAt).toLocaleString() : "Not available"}</p>
+            <p><strong>Payment reference:</strong> {quote.squarePaymentId || "Not available"}</p>
+          </>
+        ) : null}
+        {quote.paymentStatus === "PAYMENT_FAILED" && quote.paymentFailureReason ? (
+          <p><strong>Last payment issue:</strong> {quote.paymentFailureReason}</p>
+        ) : null}
         {quote.adminCustomerMessage && <p><strong>Message from NI Taxi Co:</strong> {quote.adminCustomerMessage}</p>}
         <p><strong>Terms accepted:</strong> {quote.termsAccepted ? "Yes" : "No"}</p>
         <p><strong>Created:</strong> {new Date(quote.createdAt).toLocaleString()}</p>
         <p><strong>Updated:</strong> {new Date(quote.updatedAt).toLocaleString()}</p>
       </article>
+      {paymentReady ? (
+        <SquarePayQuoteForm
+          quoteId={quote.id}
+          amount={confirmedAmount}
+          currency={confirmedCurrency}
+          onPaid={() => {
+            fetch(`/api/account/quotes/${quote.id}`, { cache: "no-store" })
+              .then(async (res) => {
+                const data = await res.json();
+                if (res.ok) setQuote(data.quote as Quote);
+              })
+              .catch(() => undefined);
+          }}
+        />
+      ) : null}
+      {!paymentReady && !isPaid ? (
+        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          We&apos;re reviewing your quote and will update it shortly.
+        </article>
+      ) : null}
     </section>
   );
 }

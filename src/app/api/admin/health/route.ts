@@ -78,5 +78,10 @@ export async function GET() {
     emailEnvConfigured,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),
     googleRoutesApiKeyPresent: Boolean(process.env.GOOGLE_ROUTES_API_KEY?.trim()),
+    squareAccessTokenPresent: Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim()),
+    squareLocationIdPresent: Boolean(process.env.SQUARE_LOCATION_ID?.trim()),
+    squareEnvironment: process.env.SQUARE_ENVIRONMENT?.trim() || "sandbox",
+    squareApplicationIdPresent: Boolean(process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID?.trim()),
+    squareClientLocationIdPresent: Boolean(process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID?.trim()),
   });
 }

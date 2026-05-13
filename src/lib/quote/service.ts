@@ -166,6 +166,8 @@ export async function createQuote(input: CreateQuoteInput) {
     termsAcceptedAt: input.termsAcceptedAt,
     policyVersion: input.policyVersion,
     quotedCurrency: "GBP",
+    confirmedCurrency: "GBP",
+    paymentStatus: "NOT_REQUIRED",
     status: "SUBMITTED",
   }, { correlationId: input.correlationId });
 

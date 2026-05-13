@@ -11,6 +11,16 @@ type Quote = {
   adminCustomerMessage?: string;
   quotedPrice?: number;
   quotedCurrency: string;
+  confirmedPrice?: number;
+  confirmedCurrency?: string;
+  paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
+  paymentProvider?: "SQUARE";
+  squarePaymentId?: string;
+  squareOrderId?: string;
+  paidAt?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
+  paymentFailureReason?: string;
   serviceType: string;
   accountType: string;
   guestName?: string;
@@ -107,7 +117,7 @@ export default function AdminQuoteDetailPage() {
     setQuote({ ...quote, ...data.quote });
   }
 
-  async function action(actionName: "mark_awaiting" | "mark_quoted" | "mark_accepted" | "mark_declined" | "mark_cancelled") {
+  async function action(actionName: "mark_awaiting" | "mark_quoted" | "mark_payment_required" | "mark_accepted" | "mark_declined" | "mark_cancelled") {
     if (!quote) return;
     const res = await fetch(`/api/admin/quotes/${quote.id}`, {
       method: "PATCH",
@@ -190,6 +200,15 @@ export default function AdminQuoteDetailPage() {
         <p>Terms accepted: {quote.termsAccepted ? "Yes" : "No"}</p>
         <p>Terms accepted at: {quote.termsAcceptedAt || "Not provided"}</p>
         <p>Policy version: {quote.policyVersion || "Not provided"}</p>
+        <hr className="my-3 border-slate-200" />
+        <p>Confirmed price: {quote.confirmedPrice ?? quote.quotedPrice ?? "Not set"} {quote.confirmedCurrency || quote.quotedCurrency || "GBP"}</p>
+        <p>Payment status: {quote.paymentStatus || "NOT_REQUIRED"}</p>
+        <p>Payment provider: {quote.paymentProvider || "N/A"}</p>
+        <p>Square payment ID: {quote.squarePaymentId || "Not available"}</p>
+        <p>Square order ID: {quote.squareOrderId || "Not available"}</p>
+        <p>Paid at: {quote.paidAt || "Not available"}</p>
+        <p>Payment amount: {quote.paymentAmount ?? "Not available"} {quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP"}</p>
+        <p>Payment failure reason: {quote.paymentFailureReason || "None"}</p>
         {parsedFareBreakdown ? (
           <div>
             <p>Fare breakdown:</p>
@@ -221,6 +240,7 @@ export default function AdminQuoteDetailPage() {
       <div className="flex flex-wrap gap-3">
         <button onClick={() => action("mark_awaiting")} className="rounded bg-slate-700 px-4 py-2 text-white">Set Awaiting Confirmation</button>
         <button onClick={() => action("mark_quoted")} className="rounded bg-amber-600 px-4 py-2 text-white">Set Quoted</button>
+        <button onClick={() => action("mark_payment_required")} className="rounded bg-indigo-700 px-4 py-2 text-white">Set Payment Required</button>
         <button onClick={() => action("mark_accepted")} className="rounded bg-emerald-700 px-4 py-2 text-white">Set Accepted</button>
         <button onClick={() => action("mark_declined")} className="rounded bg-red-700 px-4 py-2 text-white">Set Declined</button>
         <button onClick={() => action("mark_cancelled")} className="rounded bg-slate-500 px-4 py-2 text-white">Set Cancelled</button>

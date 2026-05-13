@@ -107,6 +107,16 @@ export interface QuoteRecord {
   adminCustomerMessage?: string;
   quotedPrice?: number;
   quotedCurrency: string;
+  confirmedPrice?: number;
+  confirmedCurrency?: string;
+  paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
+  paymentProvider?: "SQUARE";
+  squarePaymentId?: string;
+  squareOrderId?: string;
+  paidAt?: string;
+  paymentFailureReason?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
   estimatedFare?: number;
   finalEstimatedFare?: number;
   outwardEstimatedFare?: number;

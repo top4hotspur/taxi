@@ -62,6 +62,11 @@ Set these in Amplify Hosting (and locally for real sending):
 - `ANALYTICS_SALT` (optional, recommended for IP hashing)
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
 - `GOOGLE_ROUTES_API_KEY`
+- `SQUARE_ACCESS_TOKEN`
+- `SQUARE_LOCATION_ID`
+- `SQUARE_ENVIRONMENT=sandbox` (or `production`)
+- `NEXT_PUBLIC_SQUARE_APPLICATION_ID`
+- `NEXT_PUBLIC_SQUARE_LOCATION_ID`
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
 
@@ -203,5 +208,29 @@ CloudWatch correlation troubleshooting:
 
 ## Scope guardrails
 - Driver onboarding: not included.
-- Square payments: not included.
+- Square payments: implemented for admin-confirmed quotes only.
 - Driver reminders: manual admin trigger included; scheduled jobs not included yet.
+
+## Square payments (admin-confirmed quotes)
+- Payment flow:
+  - Customer submits quote
+  - Admin sets confirmed quote price and marks quote ready for payment
+  - Customer pays from `/account/quotes/[id]`
+  - Quote payment status updates to `PAID`
+- Server-side env vars:
+  - `SQUARE_ACCESS_TOKEN`
+  - `SQUARE_LOCATION_ID`
+  - `SQUARE_ENVIRONMENT=sandbox|production`
+- Client-safe env vars:
+  - `NEXT_PUBLIC_SQUARE_APPLICATION_ID`
+  - `NEXT_PUBLIC_SQUARE_LOCATION_ID`
+- Security notes:
+  - Payment amount is always read from server-side quote confirmed price.
+  - Client cannot choose payment amount.
+  - Access token is never exposed client-side.
+
+## Square webhook note
+- Endpoint reserved for future hardening: `POST /api/webhooks/square`
+- TODO before launch:
+  - Verify Square webhook signatures
+  - Handle `payment.updated`, `refund.updated`, `dispute.created`
