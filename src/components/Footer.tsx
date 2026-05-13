@@ -21,6 +21,8 @@ export default function Footer() {
           <p className="mt-3 text-sm text-slate-700">Email: {siteConfig.email}</p>
           <p className="mt-1 text-sm text-slate-700">Phone: {siteConfig.phone}</p>
           <p className="mt-1 text-sm text-slate-700">Registered Company Number: {siteConfig.companyNumber}</p>
+          <p className="mt-2 text-sm text-slate-700">Secure card payments processed by Square.</p>
+          <p className="mt-1 text-xs text-slate-500">Major debit and credit cards accepted.</p>
         </div>
 
         <div>

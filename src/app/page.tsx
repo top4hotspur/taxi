@@ -28,6 +28,10 @@ export default function Home() {
             </p>
           ))}
         </div>
+        <div className="mt-4 space-y-1">
+          <p className="text-sm font-medium text-slate-700">Secure card payments processed by Square.</p>
+          <p className="text-xs text-slate-500">We accept major debit and credit cards, including Visa, Mastercard and American Express.</p>
+        </div>
       </section>
 
       <section>
