@@ -109,6 +109,8 @@ export interface QuoteRecord {
   quotedCurrency: string;
   confirmedPrice?: number;
   confirmedCurrency?: string;
+  quotedAt?: string;
+  quoteExpiresAt?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
   squarePaymentId?: string;

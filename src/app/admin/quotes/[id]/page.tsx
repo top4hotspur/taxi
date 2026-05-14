@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
-import { getQuoteStatusLabel } from "@/lib/quote/constants";
+import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { getQuoteStatusLabel, normalizeQuoteStatus, type QuoteStatusValue } from "@/lib/quote/constants";
+import { formatMoney, formatUkDateTime, formatUkDateTimeFromParts, meaningfullyProvided } from "@/lib/formatting";
 
 type Quote = {
   id: string;
@@ -13,6 +14,8 @@ type Quote = {
   quotedCurrency: string;
   confirmedPrice?: number;
   confirmedCurrency?: string;
+  quotedAt?: string;
+  quoteExpiresAt?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
   squarePaymentId?: string;
@@ -26,6 +29,7 @@ type Quote = {
   guestName?: string;
   guestEmail?: string;
   customerEmail?: string | null;
+  customerProfileName?: string | null;
   guestPhone?: string;
   passengerName?: string;
   passengerPhone?: string;
@@ -34,15 +38,9 @@ type Quote = {
   leadPassengerEmail?: string;
   leadPassengerPhone?: string;
   pickupLocation: string;
-  pickupPlaceId?: string;
   pickupAddress?: string;
-  pickupLat?: number;
-  pickupLng?: number;
   dropoffLocation: string;
-  dropoffPlaceId?: string;
   dropoffAddress?: string;
-  dropoffLat?: number;
-  dropoffLng?: number;
   pickupDate: string;
   pickupTime: string;
   passengers: number;
@@ -76,27 +74,82 @@ type Quote = {
   termsAccepted?: boolean;
   termsAcceptedAt?: string;
   policyVersion?: string;
-  audits: Array<{ id: string; newStatus: string; note?: string; createdAt: string }>;
+  createdAt: string;
+  updatedAt: string;
 };
+
+const ADMIN_STATUS_OPTIONS: Array<{ label: string; value: QuoteStatusValue }> = [
+  { label: "Awaiting confirmation", value: "AWAITING_CONFIRMATION" },
+  { label: "Quoted", value: "QUOTED" },
+  { label: "Accepted", value: "ACCEPTED" },
+  { label: "Declined", value: "DECLINED" },
+  { label: "Cancelled", value: "CANCELLED" },
+];
+
+function fieldRow(label: string, value: string, keySuffix?: string) {
+  return (
+    <div className="grid grid-cols-1 gap-1 sm:grid-cols-3" key={`${label}-${value}-${keySuffix || ""}`}>
+      <p className="text-slate-500">{label}</p>
+      <p className="sm:col-span-2 font-medium text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function sectionCard(title: string, children: ReactNode) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <div className="mt-4 space-y-3 text-sm">{children}</div>
+    </article>
+  );
+}
+
+function buildBookerName(quote: Quote): string {
+  if (meaningfullyProvided(quote.guestName)) return quote.guestName!.trim();
+  if (meaningfullyProvided(quote.customerProfileName)) return quote.customerProfileName!.trim();
+  const email = (quote.guestEmail || quote.customerEmail || "").trim();
+  if (email.includes("@")) return email.split("@")[0] || "Not provided";
+  return "Not provided";
+}
 
 export default function AdminQuoteDetailPage() {
   const params = useParams<{ id: string }>();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [error, setError] = useState("");
+  const [banner, setBanner] = useState<{ tone: "success" | "warning" | "error"; message: string } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const id = params.id;
     if (!id) return;
-    fetch(`/api/admin/quotes/${id}`).then(async (res) => {
+    fetch(`/api/admin/quotes/${id}`, { cache: "no-store" }).then(async (res) => {
       const data = await res.json();
-      if (!res.ok) { setError(data.message || "Unable to load quote"); return; }
+      if (!res.ok) {
+        setError(data.message || "Unable to load quote");
+        return;
+      }
       setQuote(data.quote);
-    });
+    }).catch(() => setError("Unable to load quote"));
   }, [params.id]);
+
+  const luggageLines = useMemo(() => {
+    if (!quote) return [] as string[];
+    const lines: string[] = [];
+    const hand = quote.handLuggageCount ?? 0;
+    const suit = quote.suitcaseCount ?? 0;
+    const over = quote.oversizeItemCount ?? quote.golfBags ?? 0;
+    if (hand > 0) lines.push(`Hand luggage: ${hand}`);
+    if (suit > 0) lines.push(`Suitcases: ${suit}`);
+    if (over > 0) lines.push(`Oversize items: ${over}`);
+    return lines;
+  }, [quote]);
 
   async function update(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!quote) return;
+    if (!quote || saving) return;
+    setSaving(true);
+    setError("");
+    setBanner(null);
     const fd = new FormData(event.currentTarget);
     const payload = {
       adminNotes: fd.get("adminNotes"),
@@ -107,143 +160,184 @@ export default function AdminQuoteDetailPage() {
       note: fd.get("note"),
     };
 
-    const res = await fetch(`/api/admin/quotes/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) { setError(data.message || "Update failed"); return; }
-    setQuote({ ...quote, ...data.quote });
-  }
-
-  async function action(actionName: "mark_awaiting" | "mark_quoted" | "mark_payment_required" | "mark_accepted" | "mark_declined" | "mark_cancelled") {
-    if (!quote) return;
-    const res = await fetch(`/api/admin/quotes/${quote.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: actionName, note: actionName.replace("_", " ") }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setError(data.message || "Action failed"); return; }
-    setQuote({ ...quote, ...data.quote });
-  }
-
-  if (error) return <p className="text-red-700">{error}</p>;
-  if (!quote) return <p>Loading...</p>;
-  let parsedFareBreakdown: Record<string, unknown> | null = null;
-  if (quote.estimatedFareBreakdown) {
     try {
-      parsedFareBreakdown = JSON.parse(quote.estimatedFareBreakdown) as Record<string, unknown>;
+      const res = await fetch(`/api/admin/quotes/${quote.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const message = data.message || "Update failed";
+        setError(message);
+        setBanner({ tone: "error", message });
+        return;
+      }
+      setQuote(data.quote);
+      if (data.emailAttempted && data.emailSent) {
+        setBanner({ tone: "success", message: "Quote updated and sent to the customer." });
+      } else if (data.emailAttempted && !data.emailSent) {
+        setBanner({ tone: "warning", message: "Quote updated, but customer email could not be sent." });
+      } else {
+        setBanner({ tone: "success", message: "Quote updated." });
+      }
     } catch {
-      parsedFareBreakdown = null;
+      const message = "Update failed";
+      setError(message);
+      setBanner({ tone: "error", message });
+    } finally {
+      setSaving(false);
     }
   }
 
+  async function action(actionName: "mark_awaiting" | "mark_quoted" | "mark_payment_required" | "mark_accepted" | "mark_declined" | "mark_cancelled") {
+    if (!quote || saving) return;
+    setSaving(true);
+    setError("");
+    setBanner(null);
+    try {
+      const res = await fetch(`/api/admin/quotes/${quote.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionName, note: actionName.replace("_", " ") }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const message = data.message || "Action failed";
+        setError(message);
+        setBanner({ tone: "error", message });
+        return;
+      }
+      setQuote(data.quote);
+      setBanner({ tone: "success", message: "Quote updated." });
+    } catch {
+      const message = "Action failed";
+      setError(message);
+      setBanner({ tone: "error", message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (error && !quote) return <p className="text-red-700">{error}</p>;
+  if (!quote) return <p>Loading...</p>;
+
+  const currency = quote.confirmedCurrency || quote.quotedCurrency || quote.estimatedCurrency || "GBP";
+  const normalizedStatus = normalizeQuoteStatus(quote.status);
+  const displayStatus = normalizedStatus === "SUBMITTED" ? "Awaiting review" : getQuoteStatusLabel(normalizedStatus);
+  const showReturn = Boolean(quote.returnJourney || quote.returnJourneyNeeded);
+
   return (
     <section className="space-y-6">
-      <h1 className="text-3xl font-bold">Admin Quote {quote.id}</h1>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-        <p>Status: <strong>{quote.status}</strong></p>
-        <p>Status label: <strong>{getQuoteStatusLabel(quote.status)}</strong></p>
-        <p>Account type: {quote.accountType}</p>
-        <p>Name: {quote.guestName || "Account customer"}</p>
-        <p>Email: {quote.guestEmail || quote.customerEmail || "From customer account"}</p>
-        <p>Phone: {quote.guestPhone || "Not provided"}</p>
-        <p>Passenger name: {quote.passengerName || "Same as booker / not provided"}</p>
-        <p>Passenger phone: {quote.passengerPhone || "Same as booker / not provided"}</p>
-        <p>Lead passenger same as booker: {quote.leadPassengerSameAsBooker === false ? "No" : "Yes"}</p>
-        {quote.leadPassengerSameAsBooker === false ? (
-          <>
-            <p>Lead passenger name: {quote.leadPassengerName || "Not provided"}</p>
-            <p>Lead passenger email: {quote.leadPassengerEmail || "Not provided"}</p>
-            <p>Lead passenger phone: {quote.leadPassengerPhone || "Not provided"}</p>
-          </>
-        ) : null}
-        <p>Service: {quote.serviceType}</p>
-        <p>Date/Time: {quote.pickupDate} {quote.pickupTime}</p>
-        <p>Passengers: {quote.passengers}</p>
-        <p>Hand luggage: {quote.handLuggageCount ?? 0}</p>
-        <p>Suitcases: {quote.suitcaseCount ?? 0}</p>
-        <p>Oversize items: {quote.oversizeItemCount ?? quote.golfBags ?? 0}</p>
-        {quote.luggage ? <p>Legacy luggage note: {quote.luggage}</p> : null}
-        <p>Return journey: {quote.returnJourney ? "Yes" : "No"}</p>
-        {quote.returnJourneyNeeded || quote.returnJourney ? (
-          <>
-            <p>Return pickup: {quote.returnPickup || "Not provided"}</p>
-            <p>Return drop-off: {quote.returnDropoff || "Not provided"}</p>
-            <p>Return date/time: {quote.returnDate || "Not provided"} {quote.returnTime || ""}</p>
-          </>
-        ) : null}
-        <p>Itinerary: {quote.itineraryMessage || "Not provided"}</p>
-        <p>Pickup: {quote.pickupLocation}</p>
-        <p>Pickup address: {quote.pickupAddress || "Not provided"}</p>
-        <p>Pickup place ID: {quote.pickupPlaceId || "Not provided"}</p>
-        <p>Pickup coordinates: {quote.pickupLat !== undefined && quote.pickupLng !== undefined ? `${quote.pickupLat}, ${quote.pickupLng}` : "Not provided"}</p>
-        <p>Drop-off: {quote.dropoffLocation}</p>
-        <p>Drop-off address: {quote.dropoffAddress || "Not provided"}</p>
-        <p>Drop-off place ID: {quote.dropoffPlaceId || "Not provided"}</p>
-        <p>Drop-off coordinates: {quote.dropoffLat !== undefined && quote.dropoffLng !== undefined ? `${quote.dropoffLat}, ${quote.dropoffLng}` : "Not provided"}</p>
-        <hr className="my-3 border-slate-200" />
-        <p>Pricing source: {quote.pricingSource || "None"}</p>
-        <p>Estimated fare: {quote.finalEstimatedFare ?? quote.estimatedFare ?? "Not available"} {quote.estimatedCurrency || "GBP"}</p>
-        <p>Outward estimated fare: {quote.outwardEstimatedFare ?? "Not available"} {quote.estimatedCurrency || "GBP"}</p>
-        <p>Return estimated fare: {quote.returnEstimatedFare ?? "Not available"} {quote.estimatedCurrency || "GBP"}</p>
-        <p>Return discount: {quote.returnDiscountPercent ?? 0}% ({quote.returnDiscountAmount ?? 0} {quote.estimatedCurrency || "GBP"})</p>
-        <p>Estimated distance: {quote.estimatedDistanceMiles !== undefined ? `${quote.estimatedDistanceMiles} miles` : "Not available"}</p>
-        <p>Estimated duration: {quote.estimatedDurationMinutes !== undefined ? `${quote.estimatedDurationMinutes} minutes` : "Not available"}</p>
-        <p>Requires manual review: {quote.requiresManualReview ? "Yes" : "No"}</p>
-        <p>Manual group quote: {quote.pricingSource === "MANUAL_GROUP_QUOTE" ? "Yes" : "No"}</p>
-        <p>Route estimate failed: {quote.routeEstimateFailed ? "Yes" : "No"}</p>
-        <p>Route estimate failure reason: {quote.routeEstimateFailureReason || "None"}</p>
-        <p>Pricing calculated at: {quote.pricingCalculatedAt || "Not available"}</p>
-        <p>Terms accepted: {quote.termsAccepted ? "Yes" : "No"}</p>
-        <p>Terms accepted at: {quote.termsAcceptedAt || "Not provided"}</p>
-        <p>Policy version: {quote.policyVersion || "Not provided"}</p>
-        <hr className="my-3 border-slate-200" />
-        <p>Confirmed price: {quote.confirmedPrice ?? quote.quotedPrice ?? "Not set"} {quote.confirmedCurrency || quote.quotedCurrency || "GBP"}</p>
-        <p>Payment status: {quote.paymentStatus || "NOT_REQUIRED"}</p>
-        <p>Payment provider: {quote.paymentProvider || "N/A"}</p>
-        <p>Square payment ID: {quote.squarePaymentId || "Not available"}</p>
-        <p>Square order ID: {quote.squareOrderId || "Not available"}</p>
-        <p>Paid at: {quote.paidAt || "Not available"}</p>
-        <p>Payment amount: {quote.paymentAmount ?? "Not available"} {quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP"}</p>
-        <p>Payment failure reason: {quote.paymentFailureReason || "None"}</p>
-        {parsedFareBreakdown ? (
-          <div>
-            <p>Fare breakdown:</p>
-            <ul className="list-disc pl-5">
-              {Object.entries(parsedFareBreakdown).map(([key, value]) => (
-                <li key={key}>{key}: {String(value)}</li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          <p>Fare breakdown: {quote.estimatedFareBreakdown || "Not available"}</p>
-        )}
+      <header>
+        <h1 className="text-3xl font-bold">Quote {quote.id.slice(0, 8).toUpperCase()}</h1>
+      </header>
+
+      {banner ? (
+        <div className={`rounded-xl border px-4 py-3 text-sm ${banner.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : banner.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-900"}`}>
+          {banner.message}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {sectionCard("Quote summary", <>
+          {fieldRow("Reference", quote.id.slice(0, 8).toUpperCase())}
+          {fieldRow("Status", displayStatus)}
+          {fieldRow("Created", formatUkDateTime(quote.createdAt))}
+          {fieldRow("Updated", formatUkDateTime(quote.updatedAt))}
+          {fieldRow("Confirmed price", formatMoney(quote.confirmedPrice ?? quote.quotedPrice, quote.confirmedCurrency || quote.quotedCurrency || "GBP"))}
+          {(quote.finalEstimatedFare ?? quote.estimatedFare) !== undefined ? fieldRow("Estimated fare", formatMoney(quote.finalEstimatedFare ?? quote.estimatedFare, quote.estimatedCurrency || "GBP")) : null}
+          {quote.paymentStatus ? fieldRow("Payment status", quote.paymentStatus.replaceAll("_", " ")) : null}
+        </>)}
+
+        {sectionCard("Booker / customer details", <>
+          {fieldRow("Account type", quote.accountType)}
+          {fieldRow("Customer name", buildBookerName(quote))}
+          {fieldRow("Email", (quote.guestEmail || quote.customerEmail || "Not provided").trim() || "Not provided")}
+          {fieldRow("Phone", quote.guestPhone?.trim() || "Not provided")}
+        </>)}
+
+        {sectionCard("Lead passenger", <>
+          {fieldRow("Lead passenger same as booker", quote.leadPassengerSameAsBooker === false ? "No" : "Yes")}
+          {quote.leadPassengerSameAsBooker === false ? (
+            <>
+              {fieldRow("Name", quote.leadPassengerName?.trim() || "Not provided")}
+              {fieldRow("Email", quote.leadPassengerEmail?.trim() || "Not provided")}
+              {fieldRow("Phone", quote.leadPassengerPhone?.trim() || "Not provided")}
+            </>
+          ) : fieldRow("Details", "Same as booker")}
+        </>)}
+
+        {sectionCard("Trip details", <>
+          {fieldRow("Service type", quote.serviceType)}
+          {fieldRow("Outward pickup", quote.pickupLocation || quote.pickupAddress || "Not provided")}
+          {fieldRow("Outward drop-off", quote.dropoffLocation || quote.dropoffAddress || "Not provided")}
+          {fieldRow("Outward date/time", formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime))}
+          {fieldRow("Return journey", showReturn ? "Yes" : "No")}
+          {showReturn ? (
+            <>
+              {fieldRow("Return pickup", quote.returnPickup?.trim() || "Not provided")}
+              {fieldRow("Return drop-off", quote.returnDropoff?.trim() || "Not provided")}
+              {fieldRow("Return date/time", formatUkDateTimeFromParts(quote.returnDate, quote.returnTime))}
+            </>
+          ) : null}
+          {fieldRow("Passenger count", String(quote.passengers || 0))}
+          {luggageLines.length > 0 ? luggageLines.map((line, index) => fieldRow(index === 0 ? "Luggage" : "", line)) : fieldRow("Luggage", "No luggage declared.")}
+        </>)}
+
+        {sectionCard("Special requests / itinerary", fieldRow("Message", quote.itineraryMessage?.trim() || "Not provided"))}
+
+        {sectionCard("Pricing", <>
+          {fieldRow("Estimated fare", formatMoney(quote.finalEstimatedFare ?? quote.estimatedFare, quote.estimatedCurrency || "GBP"))}
+          {quote.outwardEstimatedFare !== undefined ? fieldRow("Outward estimate", formatMoney(quote.outwardEstimatedFare, quote.estimatedCurrency || "GBP")) : null}
+          {showReturn && quote.returnEstimatedFare !== undefined ? fieldRow("Return estimate", formatMoney(quote.returnEstimatedFare, quote.estimatedCurrency || "GBP")) : null}
+          {showReturn && (quote.returnDiscountPercent || 0) > 0 ? fieldRow("Return discount", `${quote.returnDiscountPercent}% (${formatMoney(quote.returnDiscountAmount || 0, quote.estimatedCurrency || "GBP")})`) : null}
+          {quote.estimatedDistanceMiles !== undefined ? fieldRow("Estimated distance", `${quote.estimatedDistanceMiles} miles`) : null}
+          {quote.estimatedDurationMinutes !== undefined ? fieldRow("Estimated duration", `${quote.estimatedDurationMinutes} minutes`) : null}
+          {quote.pricingCalculatedAt ? fieldRow("Pricing calculated", formatUkDateTime(quote.pricingCalculatedAt)) : null}
+          {quote.requiresManualReview ? fieldRow("Manual review", "Yes") : null}
+          {quote.pricingSource === "MANUAL_GROUP_QUOTE" ? fieldRow("Manual group quote", "Yes") : null}
+          {quote.routeEstimateFailed ? fieldRow("Route estimate failed", quote.routeEstimateFailureReason || "Unable to calculate route estimate") : null}
+        </>)}
+
+        {sectionCard("Terms / compliance", <>
+          {fieldRow("Terms accepted", quote.termsAccepted ? "Yes" : "No")}
+          {quote.termsAcceptedAt ? fieldRow("Accepted at", formatUkDateTime(quote.termsAcceptedAt)) : null}
+          {quote.policyVersion ? fieldRow("Policy version", quote.policyVersion) : null}
+        </>)}
+
+        {sectionCard("Payment", <>
+          {fieldRow("Confirmed price", formatMoney(quote.confirmedPrice ?? quote.quotedPrice, currency))}
+          {quote.paymentStatus ? fieldRow("Payment status", quote.paymentStatus.replaceAll("_", " ")) : null}
+          {quote.quoteExpiresAt ? fieldRow("Quote valid until", formatUkDateTime(quote.quoteExpiresAt)) : null}
+          {quote.paidAt ? fieldRow("Paid at", formatUkDateTime(quote.paidAt)) : null}
+          {quote.paymentAmount !== undefined ? fieldRow("Payment amount", formatMoney(quote.paymentAmount, quote.paymentCurrency || currency)) : null}
+          {quote.squarePaymentId ? fieldRow("Square payment ID", quote.squarePaymentId) : null}
+          {quote.paymentStatus === "PAYMENT_FAILED" && quote.paymentFailureReason ? fieldRow("Failure reason", quote.paymentFailureReason) : null}
+        </>)}
       </div>
 
       <form onSubmit={update} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <textarea name="adminNotes" defaultValue={quote.adminNotes || ""} placeholder="Admin notes" className="w-full rounded border border-slate-300 p-2" rows={4} />
         <textarea name="adminCustomerMessage" defaultValue={quote.adminCustomerMessage || ""} placeholder="Customer-visible message" className="w-full rounded border border-slate-300 p-2" rows={3} />
         <div className="grid gap-3 sm:grid-cols-3">
-          <input name="quotedPrice" type="number" step="0.01" defaultValue={quote.quotedPrice || ""} placeholder="Quoted price" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="quotedPrice" type="number" step="0.01" defaultValue={quote.quotedPrice || ""} placeholder="Confirmed price" className="rounded border border-slate-300 px-3 py-2" />
           <input name="quotedCurrency" defaultValue={quote.quotedCurrency || "GBP"} placeholder="Currency" className="rounded border border-slate-300 px-3 py-2" />
-          <select name="status" defaultValue={quote.status} className="rounded border border-slate-300 px-3 py-2">
-            {["SUBMITTED","AWAITING_CONFIRMATION","QUOTED","ACCEPTED","DECLINED","CANCELLED"].map((s) => <option key={s} value={s}>{s}</option>)}
+          <select name="status" defaultValue={normalizeQuoteStatus(quote.status)} className="rounded border border-slate-300 px-3 py-2">
+            {ADMIN_STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </div>
         <input name="note" placeholder="Audit note" className="w-full rounded border border-slate-300 px-3 py-2" />
-        <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-white">Update Quote</button>
+        <button type="submit" disabled={saving} className="rounded bg-slate-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60">{saving ? "Updating..." : "Update Quote"}</button>
       </form>
 
       <div className="flex flex-wrap gap-3">
-        <button onClick={() => action("mark_awaiting")} className="rounded bg-slate-700 px-4 py-2 text-white">Set Awaiting Confirmation</button>
-        <button onClick={() => action("mark_quoted")} className="rounded bg-amber-600 px-4 py-2 text-white">Set Quoted</button>
-        <button onClick={() => action("mark_payment_required")} className="rounded bg-indigo-700 px-4 py-2 text-white">Set Payment Required</button>
-        <button onClick={() => action("mark_accepted")} className="rounded bg-emerald-700 px-4 py-2 text-white">Set Accepted</button>
-        <button onClick={() => action("mark_declined")} className="rounded bg-red-700 px-4 py-2 text-white">Set Declined</button>
-        <button onClick={() => action("mark_cancelled")} className="rounded bg-slate-500 px-4 py-2 text-white">Set Cancelled</button>
+        <button disabled={saving} onClick={() => action("mark_awaiting")} className="rounded bg-slate-700 px-4 py-2 text-white disabled:opacity-60">Set Awaiting confirmation</button>
+        <button disabled={saving} onClick={() => action("mark_quoted")} className="rounded bg-amber-600 px-4 py-2 text-white disabled:opacity-60">Set Quoted</button>
+        <button disabled={saving} onClick={() => action("mark_payment_required")} className="rounded bg-indigo-700 px-4 py-2 text-white disabled:opacity-60">Set Payment Required</button>
+        <button disabled={saving} onClick={() => action("mark_accepted")} className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-60">Set Accepted</button>
+        <button disabled={saving} onClick={() => action("mark_declined")} className="rounded bg-red-700 px-4 py-2 text-white disabled:opacity-60">Set Declined</button>
+        <button disabled={saving} onClick={() => action("mark_cancelled")} className="rounded bg-slate-500 px-4 py-2 text-white disabled:opacity-60">Set Cancelled</button>
       </div>
     </section>
   );

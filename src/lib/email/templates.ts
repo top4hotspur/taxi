@@ -58,13 +58,22 @@ export function customerQuoteUpdatedEmail(quote: QuoteRecord, isGuest: boolean) 
 }
 
 export function customerQuoteSentEmail(quote: QuoteRecord, isGuest: boolean) {
-  const priceLine = quote.quotedPrice !== undefined ? `Quoted price: ${quote.quotedCurrency} ${quote.quotedPrice}` : "Quoted price: Pending";
+  const amount = quote.confirmedPrice ?? quote.quotedPrice;
+  const currency = quote.confirmedCurrency || quote.quotedCurrency || "GBP";
+  const priceLine = amount !== undefined ? `Confirmed quote: ${currency} ${amount}` : "Confirmed quote: Pending";
+  const expiryLine = quote.quoteExpiresAt ? `Valid until: ${new Date(quote.quoteExpiresAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}` : "Valid for 24 hours unless otherwise agreed.";
+  const journeySummary = [
+    `Outward: ${quote.pickupLocation} -> ${quote.dropoffLocation} (${quote.pickupDate} ${quote.pickupTime})`,
+    quote.returnJourney || quote.returnJourneyNeeded
+      ? `Return: ${(quote.returnPickup || "Not provided")} -> ${(quote.returnDropoff || "Not provided")} (${quote.returnDate || "Not provided"} ${quote.returnTime || ""})`
+      : "Return: No",
+  ].join("\n");
   const cta = isGuest
     ? "Reply to this email to accept or decline, or create an account using the same email to track your request."
     : `Review and respond here: ${siteUrl}/account/quotes/${quote.id}`;
   return {
-    subject: `Your quote is ready (${quote.id})`,
-    text: `Your quote is ready.\n${priceLine}\n\n${quoteSummary(quote)}\n\n${cta}\n\n${emailFooter()}`,
+    subject: "Your NI Taxi Co quote is ready",
+    text: `Your quote is ready.\n${priceLine}\n${expiryLine}\n\n${journeySummary}\n\n${quote.adminCustomerMessage ? `Message from NI Taxi Co:\n${quote.adminCustomerMessage}\n\n` : ""}${cta}\n\nQuote reference: ${quote.id}\n\n${emailFooter()}`,
   };
 }
 
