@@ -93,9 +93,13 @@ export default function SquarePayQuoteForm({ quoteId, amount, currency, onPaid }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quoteId, sourceId: tokenized.token }),
       });
-      const result = (await response.json()) as { ok?: boolean; error?: string };
+      const result = (await response.json()) as { ok?: boolean; error?: string; message?: string; errorCode?: string };
       if (!response.ok || !result.ok) {
-        setError(result.error || "Payment could not be completed.");
+        if (process.env.NODE_ENV === "development" && result.errorCode) {
+          setError(`${result.message || "Unable to process payment right now. Please try again or contact us."} (${result.errorCode})`);
+        } else {
+          setError("Unable to process payment right now. Please try again or contact us.");
+        }
         return;
       }
 
@@ -112,6 +116,7 @@ export default function SquarePayQuoteForm({ quoteId, amount, currency, onPaid }
     <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
       <p className="text-lg font-semibold">Pay {currency} {amount.toFixed(2)}</p>
       <div id="square-card-container" className="min-h-24 rounded-lg border border-slate-300 p-3" />
+      <p className="text-xs text-slate-500">For UK cards, enter your billing postcode in the ZIP field.</p>
       <p className="text-xs text-slate-600">
         By paying, you agree to our <a className="underline" href="/terms" target="_blank" rel="noreferrer">Terms &amp; Conditions</a> and <a className="underline" href="/policies" target="_blank" rel="noreferrer">Policies</a>.
       </p>

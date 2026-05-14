@@ -6,60 +6,149 @@ import { sendEmail } from "@/lib/email/sendEmail";
 import { adminPaymentReceivedEmail, customerPaymentConfirmedEmail } from "@/lib/email/templates";
 import { getSquareClient, getSquareLocationId, toMinorUnits } from "@/lib/payments/square";
 
+type SafeDiagnostics = {
+  squareEnvironment: "sandbox" | "production" | "missing";
+  squareAccessTokenPresent: boolean;
+  squareLocationIdPresent: boolean;
+  quoteFound: boolean;
+  quoteOwnedByCustomer: boolean;
+  confirmedPricePresent: boolean;
+  confirmedPriceValue: number | null;
+  paymentStatus: string;
+  amountMinorUnits: number | null;
+  squareErrorCategory: string | null;
+  squareErrorCode: string | null;
+  squareStatusCode: number | null;
+};
+
+function currentSquareEnvironment(): "sandbox" | "production" | "missing" {
+  const raw = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase();
+  if (!raw) return "missing";
+  return raw === "production" ? "production" : "sandbox";
+}
+
+function baseDiagnostics(): SafeDiagnostics {
+  return {
+    squareEnvironment: currentSquareEnvironment(),
+    squareAccessTokenPresent: Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim()),
+    squareLocationIdPresent: Boolean(process.env.SQUARE_LOCATION_ID?.trim()),
+    quoteFound: false,
+    quoteOwnedByCustomer: false,
+    confirmedPricePresent: false,
+    confirmedPriceValue: null,
+    paymentStatus: "UNKNOWN",
+    amountMinorUnits: null,
+    squareErrorCategory: null,
+    squareErrorCode: null,
+    squareStatusCode: null,
+  };
+}
+
+function safeFailure(
+  diagnostics: SafeDiagnostics,
+  correlationId: string,
+  status: number,
+  errorCode: string,
+  message = "Unable to process payment right now. Please try again or contact us."
+) {
+  return NextResponse.json({ ok: false, errorCode, message, diagnostics, correlationId }, { status });
+}
+
+function extractSquareError(err: unknown) {
+  const asAny = err as {
+    statusCode?: number;
+    response?: { statusCode?: number; body?: unknown };
+    body?: unknown;
+    errors?: Array<{ category?: string; code?: string }>;
+  };
+
+  const body = asAny.body || asAny.response?.body;
+  const bodyErrors = Array.isArray((body as { errors?: unknown })?.errors)
+    ? ((body as { errors?: Array<{ category?: string; code?: string }> }).errors || [])
+    : [];
+  const topErrors = Array.isArray(asAny.errors) ? asAny.errors : [];
+  const first = bodyErrors[0] || topErrors[0] || null;
+
+  return {
+    category: first?.category || null,
+    code: first?.code || null,
+    statusCode: asAny.statusCode || asAny.response?.statusCode || null,
+  };
+}
+
 export async function POST(request: Request) {
   const correlationId = crypto.randomUUID();
+  const diagnostics = baseDiagnostics();
 
   try {
     const user = await getCurrentSessionUser();
     if (!user || user.role !== "customer") {
-      return NextResponse.json({ ok: false, error: "Unauthorized", errorCode: "UNAUTHORIZED", correlationId }, { status: 401 });
+      return safeFailure(diagnostics, correlationId, 401, "UNAUTHORIZED");
     }
 
     const body = (await request.json()) as { quoteId?: string; sourceId?: string };
     const quoteId = String(body.quoteId || "").trim();
     const sourceId = String(body.sourceId || "").trim();
 
-    if (!quoteId || !sourceId) {
-      return NextResponse.json({ ok: false, error: "Missing required payment fields.", errorCode: "VALIDATION_FAILED", correlationId }, { status: 400 });
+    if (!quoteId) {
+      return safeFailure(diagnostics, correlationId, 400, "QUOTE_ID_MISSING");
+    }
+    if (!sourceId) {
+      return safeFailure(diagnostics, correlationId, 400, "SOURCE_ID_MISSING");
     }
 
     const quote = await db.findQuoteById(quoteId);
+    diagnostics.quoteFound = Boolean(quote);
     if (!quote) {
-      return NextResponse.json({ ok: false, error: "Quote not found.", errorCode: "QUOTE_NOT_FOUND", correlationId }, { status: 404 });
+      return safeFailure(diagnostics, correlationId, 404, "QUOTE_NOT_FOUND");
     }
 
     const normalizedEmail = user.email.trim().toLowerCase();
     const owned = quote.customerId === user.userId || (quote.guestEmail || "").trim().toLowerCase() === normalizedEmail;
+    diagnostics.quoteOwnedByCustomer = owned;
     if (!owned) {
-      return NextResponse.json({ ok: false, error: "Forbidden", errorCode: "FORBIDDEN", correlationId }, { status: 403 });
+      return safeFailure(diagnostics, correlationId, 403, "QUOTE_NOT_OWNED");
     }
 
-    const amount = Number(quote.confirmedPrice ?? quote.quotedPrice);
-    const currency = "GBP";
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ ok: false, error: "This quote is not ready for payment.", errorCode: "PAYMENT_NOT_READY", correlationId }, { status: 400 });
+    const confirmedPrice = Number(quote.confirmedPrice ?? quote.quotedPrice);
+    diagnostics.confirmedPricePresent = Number.isFinite(confirmedPrice) && confirmedPrice > 0;
+    diagnostics.confirmedPriceValue = Number.isFinite(confirmedPrice) ? confirmedPrice : null;
+
+    if (!diagnostics.confirmedPricePresent) {
+      return safeFailure(diagnostics, correlationId, 409, "CONFIRMED_PRICE_MISSING");
     }
 
     const paymentStatus = quote.paymentStatus || "NOT_REQUIRED";
+    diagnostics.paymentStatus = paymentStatus;
+
     if (paymentStatus === "PAID") {
-      return NextResponse.json({ ok: true, message: "Quote already paid.", quoteId: quote.id, paymentStatus: "PAID", correlationId });
+      return NextResponse.json({ ok: true, quoteId: quote.id, paymentStatus: "PAID", correlationId });
+    }
+    if (paymentStatus !== "PAYMENT_REQUIRED") {
+      return safeFailure(diagnostics, correlationId, 409, "PAYMENT_STATUS_INVALID");
     }
 
-    if (!["PAYMENT_REQUIRED", "PAYMENT_FAILED"].includes(paymentStatus)) {
-      return NextResponse.json({ ok: false, error: "Payment is not currently enabled for this quote.", errorCode: "PAYMENT_STATUS_INVALID", correlationId }, { status: 400 });
+    if (!diagnostics.squareAccessTokenPresent || !diagnostics.squareLocationIdPresent) {
+      return safeFailure(diagnostics, correlationId, 503, "SQUARE_CONFIG_MISSING");
+    }
+
+    const amountMinorUnits = Number(toMinorUnits(confirmedPrice));
+    diagnostics.amountMinorUnits = Number.isFinite(amountMinorUnits) ? amountMinorUnits : null;
+    if (!diagnostics.amountMinorUnits || diagnostics.amountMinorUnits <= 0) {
+      return safeFailure(diagnostics, correlationId, 400, "AMOUNT_INVALID");
     }
 
     const square = getSquareClient();
     const locationId = getSquareLocationId();
-    const idempotencyKey = crypto.createHash("sha256").update(`${quote.id}:${amount}:${currency}:${sourceId.slice(0, 12)}`).digest("hex");
+    const idempotencyKey = crypto.randomUUID();
 
     const paymentResponse = await square.payments.create({
       sourceId,
       idempotencyKey,
       locationId,
       amountMoney: {
-        amount: toMinorUnits(amount),
-        currency,
+        amount: BigInt(diagnostics.amountMinorUnits),
+        currency: "GBP",
       },
       note: `NI Taxi Co quote ${quote.id}`,
       referenceId: quote.id,
@@ -68,25 +157,47 @@ export async function POST(request: Request) {
     const payment = paymentResponse.payment;
     if (!payment || payment.status !== "COMPLETED") {
       const failReason = payment?.status || "PAYMENT_NOT_COMPLETED";
-      await db.updateQuote(quote.id, {
-        paymentStatus: "PAYMENT_FAILED",
-        paymentFailureReason: failReason,
-      }, { correlationId });
+      await db.updateQuote(
+        quote.id,
+        {
+          paymentStatus: "PAYMENT_FAILED",
+          paymentFailureReason: failReason,
+        },
+        { correlationId }
+      );
 
-      return NextResponse.json({ ok: false, error: "Payment could not be completed. Please try again.", errorCode: "PAYMENT_FAILED", correlationId }, { status: 400 });
+      diagnostics.squareErrorCode = failReason;
+      console.error(
+        JSON.stringify({
+          level: "error",
+          source: "api.payments.square.pay-quote",
+          correlationId,
+          quoteId: quote.id,
+          customerUserId: user.userId,
+          customerEmail: normalizedEmail,
+          squareEnvironment: diagnostics.squareEnvironment,
+          amountMinorUnits: diagnostics.amountMinorUnits,
+          squareErrorCode: diagnostics.squareErrorCode,
+        })
+      );
+
+      return safeFailure(diagnostics, correlationId, 400, "PAYMENT_FAILED");
     }
 
-    const updated = await db.updateQuote(quote.id, {
-      paymentStatus: "PAID",
-      paymentProvider: "SQUARE",
-      squarePaymentId: payment.id,
-      squareOrderId: payment.orderId,
-      paymentAmount: amount,
-      paymentCurrency: currency,
-      paidAt: new Date().toISOString(),
-      paymentFailureReason: undefined,
-      status: quote.status === "QUOTED" ? "ACCEPTED" : quote.status,
-    }, { correlationId });
+    const updated = await db.updateQuote(
+      quote.id,
+      {
+        paymentStatus: "PAID",
+        paymentProvider: "SQUARE",
+        squarePaymentId: payment.id,
+        squareOrderId: payment.orderId,
+        paymentAmount: confirmedPrice,
+        paymentCurrency: "GBP",
+        paidAt: new Date().toISOString(),
+        paymentFailureReason: undefined,
+      },
+      { correlationId }
+    );
 
     if (updated) {
       const recipient = quote.guestEmail || user.email;
@@ -109,17 +220,35 @@ export async function POST(request: Request) {
       paidAt: updated?.paidAt,
     });
   } catch (error) {
-    console.error(JSON.stringify({
-      level: "error",
-      source: "api.payments.square.pay-quote",
-      correlationId,
-      message: error instanceof Error ? error.message : "Unknown error",
-    }));
+    const sqError = extractSquareError(error);
+    diagnostics.squareErrorCategory = sqError.category;
+    diagnostics.squareErrorCode = sqError.code;
+    diagnostics.squareStatusCode = sqError.statusCode;
 
-    if (error instanceof Error && error.message.startsWith("SQUARE_CONFIG_MISSING")) {
-      return NextResponse.json({ ok: false, error: "Payment is not configured yet.", errorCode: "SQUARE_CONFIG_MISSING", correlationId }, { status: 503 });
-    }
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "api.payments.square.pay-quote",
+        correlationId,
+        squareEnvironment: diagnostics.squareEnvironment,
+        amountMinorUnits: diagnostics.amountMinorUnits,
+        squareErrorCategory: diagnostics.squareErrorCategory,
+        squareErrorCode: diagnostics.squareErrorCode,
+        squareStatusCode: diagnostics.squareStatusCode,
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
 
-    return NextResponse.json({ ok: false, error: "Unable to process payment right now.", errorCode: "PAYMENT_PROCESSING_ERROR", correlationId }, { status: 500 });
+    const message = "Unable to process payment right now. Please try again or contact us.";
+    return NextResponse.json(
+      {
+        ok: false,
+        errorCode: "PAYMENT_PROCESSING_ERROR",
+        message,
+        diagnostics,
+        correlationId,
+      },
+      { status: 500 }
+    );
   }
 }

@@ -51,6 +51,21 @@ export async function GET() {
       process.env.EMAIL_FROM?.trim() &&
       process.env.ADMIN_EMAIL?.trim()
   );
+  const squareEnvironment = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() || "missing";
+  const squareAccessTokenPresent = Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim());
+  const squareLocationIdPresent = Boolean(process.env.SQUARE_LOCATION_ID?.trim());
+  const squareApplicationId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID?.trim() || "";
+  const squareClientLocationIdPresent = Boolean(process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID?.trim());
+  const squareApplicationIdPresent = Boolean(squareApplicationId);
+  const squareModeValid = squareEnvironment === "sandbox" || squareEnvironment === "production";
+  const sandboxAppId = squareApplicationId.toLowerCase().startsWith("sandbox-");
+  const productionAppId = squareApplicationId.toLowerCase().startsWith("sq0idp-");
+  const squareModeAppIdMatch =
+    !squareApplicationIdPresent ||
+    (squareEnvironment === "sandbox" && sandboxAppId) ||
+    (squareEnvironment === "production" && productionAppId);
+  const squareServerConfigured = squareModeValid && squareAccessTokenPresent && squareLocationIdPresent;
+  const squareClientConfigured = squareApplicationIdPresent && squareClientLocationIdPresent && squareModeAppIdMatch;
 
   return NextResponse.json({
     ok: true,
@@ -78,10 +93,14 @@ export async function GET() {
     emailEnvConfigured,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),
     googleRoutesApiKeyPresent: Boolean(process.env.GOOGLE_ROUTES_API_KEY?.trim()),
-    squareAccessTokenPresent: Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim()),
-    squareLocationIdPresent: Boolean(process.env.SQUARE_LOCATION_ID?.trim()),
-    squareEnvironment: process.env.SQUARE_ENVIRONMENT?.trim() || "sandbox",
-    squareApplicationIdPresent: Boolean(process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID?.trim()),
-    squareClientLocationIdPresent: Boolean(process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID?.trim()),
+    squareAccessTokenPresent,
+    squareLocationIdPresent,
+    squareEnvironment,
+    squareApplicationIdPresent,
+    squareClientLocationIdPresent,
+    squareModeValid,
+    squareServerConfigured,
+    squareClientConfigured,
+    squareModeAppIdMatch,
   });
 }
