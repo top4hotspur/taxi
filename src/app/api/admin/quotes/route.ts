@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const quotes = await db.filterQuotes({
     status: searchParams.get("status") || undefined,
+    paymentStatus: searchParams.get("paymentStatus") || undefined,
     serviceType: searchParams.get("serviceType") || undefined,
     fromDate: searchParams.get("fromDate") || undefined,
     toDate: searchParams.get("toDate") || undefined,

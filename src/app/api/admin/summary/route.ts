@@ -16,6 +16,11 @@ export async function GET() {
       acceptedQuotes: quotes.filter((q) => q.status === "ACCEPTED").length,
       bookingsCreated: quotes.filter((q) => q.status === "AWAITING_CONFIRMATION").length,
       bookingsConfirmed: quotes.filter((q) => q.status === "ACCEPTED").length,
+      paidQuotes: quotes.filter((q) => q.paymentStatus === "PAID").length,
     },
+    recentPaidQuotes: quotes
+      .filter((q) => q.paymentStatus === "PAID")
+      .sort((a, b) => (b.paidAt || b.updatedAt).localeCompare(a.paidAt || a.updatedAt))
+      .slice(0, 5),
   });
 }

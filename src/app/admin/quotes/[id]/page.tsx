@@ -233,6 +233,15 @@ export default function AdminQuoteDetailPage() {
         <h1 className="text-3xl font-bold">Quote {quote.id.slice(0, 8).toUpperCase()}</h1>
       </header>
 
+      {quote.paymentStatus === "PAID" ? (
+        <article className="rounded-2xl border border-emerald-300 bg-emerald-50 p-5 text-sm text-emerald-900 shadow-sm">
+          <h2 className="text-lg font-semibold">Payment received</h2>
+          <p>Amount paid: {formatMoney(quote.paymentAmount ?? quote.confirmedPrice ?? quote.quotedPrice, quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP")}</p>
+          <p>Paid at: {quote.paidAt ? formatUkDateTime(quote.paidAt) : "Not available"}</p>
+          <p>Square payment ID: {quote.squarePaymentId || "Not available"}</p>
+        </article>
+      ) : null}
+
       {banner ? (
         <div className={`rounded-xl border px-4 py-3 text-sm ${banner.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : banner.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-900"}`}>
           {banner.message}

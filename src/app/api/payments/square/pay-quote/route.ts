@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { adminPaymentReceivedEmail, customerPaymentConfirmedEmail } from "@/lib/email/templates";
 import { getSquareClient, getSquareLocationId, toMinorUnits } from "@/lib/payments/square";
+import { updateQuoteStatusAudit } from "@/lib/quote/service";
 
 type SafeDiagnostics = {
   squareEnvironment: "sandbox" | "production" | "missing";
@@ -187,6 +188,7 @@ export async function POST(request: Request) {
     const updated = await db.updateQuote(
       quote.id,
       {
+        status: quote.status === "QUOTED" ? "ACCEPTED" : quote.status,
         paymentStatus: "PAID",
         paymentProvider: "SQUARE",
         squarePaymentId: payment.id,
@@ -198,6 +200,17 @@ export async function POST(request: Request) {
       },
       { correlationId }
     );
+
+    if (updated && quote.status === "QUOTED") {
+      await updateQuoteStatusAudit({
+        quoteId: quote.id,
+        changedByRole: "customer",
+        changedByUserId: user.userId,
+        previousStatus: quote.status,
+        newStatus: "ACCEPTED",
+        note: "Quote marked accepted after successful payment",
+      });
+    }
 
     if (updated) {
       const recipient = quote.guestEmail || user.email;

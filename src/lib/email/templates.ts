@@ -135,7 +135,7 @@ export function adminPaymentReceivedEmail(quote: QuoteRecord) {
   const amount = quote.paymentAmount ?? quote.confirmedPrice ?? quote.quotedPrice ?? 0;
   const currency = quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP";
   return {
-    subject: `Payment received for quote ${quote.id}`,
+    subject: `Payment received for NI Taxi Co quote (${quote.id})`,
     text: `A customer payment has been received.\n\nQuote ID: ${quote.id}\nAmount: ${currency} ${amount}\nSquare payment ID: ${quote.squarePaymentId || "N/A"}\nRoute: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\n${emailFooter()}`,
   };
 }

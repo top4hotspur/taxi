@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -10,6 +10,7 @@ type Summary = {
   acceptedQuotes: number;
   bookingsCreated: number;
   bookingsConfirmed: number;
+  paidQuotes: number;
 };
 
 type QuoteRow = {
@@ -21,6 +22,9 @@ type QuoteRow = {
   pickupDate: string;
   pickupTime: string;
   status: string;
+  paymentStatus?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
   customer?: { email?: string } | null;
 };
 
@@ -30,11 +34,18 @@ const summaryCards: Array<{ key: keyof Summary; label: string }> = [
   { key: "acceptedQuotes", label: "Accepted Quotes" },
   { key: "bookingsCreated", label: "Bookings Created" },
   { key: "bookingsConfirmed", label: "Bookings Confirmed" },
+  { key: "paidQuotes", label: "Paid Quotes" },
 ];
+
+function formatMoney(amount?: number, currency = "GBP") {
+  if (amount === undefined || amount === null || Number.isNaN(amount)) return "-";
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amount);
+}
 
 export default function AdminPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
+  const [recentPaid, setRecentPaid] = useState<QuoteRow[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -45,6 +56,7 @@ export default function AdminPage() {
         return;
       }
       setSummary(data.summary);
+      setRecentPaid((data.recentPaidQuotes || []) as QuoteRow[]);
     });
 
     fetch("/api/admin/quotes").then(async (res) => {
@@ -73,6 +85,23 @@ export default function AdminPage() {
       )}
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Recently Paid</h2>
+        {recentPaid.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No paid quotes yet.</p>
+        ) : (
+          <ul className="mt-3 space-y-2 text-sm">
+            {recentPaid.map((quote) => (
+              <li key={quote.id} className="rounded border border-emerald-200 bg-emerald-50 p-3">
+                <div className="font-medium">{quote.guestName || quote.customer?.email || "Customer"} • {formatMoney(quote.paymentAmount, quote.paymentCurrency || "GBP")}</div>
+                <div className="text-slate-700">{quote.pickupLocation} → {quote.dropoffLocation} ({quote.pickupDate} {quote.pickupTime})</div>
+                <Link href={`/admin/quotes/${quote.id}`} className="text-slate-800 underline">View quote</Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-slate-900">Recent Quotes</h2>
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -85,6 +114,7 @@ export default function AdminPage() {
                 <th className="px-2 py-2 font-medium">Drop-off</th>
                 <th className="px-2 py-2 font-medium">Date/Time</th>
                 <th className="px-2 py-2 font-medium">Status</th>
+                <th className="px-2 py-2 font-medium">Payment</th>
               </tr>
             </thead>
             <tbody>
@@ -101,11 +131,12 @@ export default function AdminPage() {
                   <td className="px-2 py-2">{quote.dropoffLocation}</td>
                   <td className="px-2 py-2">{quote.pickupDate} {quote.pickupTime}</td>
                   <td className="px-2 py-2">{quote.status}</td>
+                  <td className="px-2 py-2">{quote.paymentStatus || "NOT_REQUIRED"}</td>
                 </tr>
               ))}
               {quotes.length === 0 && (
                 <tr>
-                  <td className="px-2 py-3 text-slate-500" colSpan={7}>No quotes available.</td>
+                  <td className="px-2 py-3 text-slate-500" colSpan={8}>No quotes available.</td>
                 </tr>
               )}
             </tbody>

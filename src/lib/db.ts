@@ -586,10 +586,11 @@ export const db = {
     return ((result.Items as QuoteRecord[] | undefined) || []).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
-  async filterQuotes(filter: { status?: string; serviceType?: string; fromDate?: string; toDate?: string }) {
+  async filterQuotes(filter: { status?: string; paymentStatus?: string; serviceType?: string; fromDate?: string; toDate?: string }) {
     const all = await this.listQuotes();
     return all.filter((q) => {
       if (filter.status && q.status !== filter.status) return false;
+      if (filter.paymentStatus && (q.paymentStatus || "NOT_REQUIRED") !== filter.paymentStatus) return false;
       if (filter.serviceType && q.serviceType !== filter.serviceType) return false;
       if (filter.fromDate && q.pickupDate < filter.fromDate) return false;
       if (filter.toDate && q.pickupDate > filter.toDate) return false;
