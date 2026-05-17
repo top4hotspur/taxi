@@ -39,6 +39,15 @@ type Quote = {
   confirmedCurrency?: string;
   quotedAt?: string;
   quoteExpiresAt?: string;
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
+  assignedDriverPhotoUrl?: string;
+  assignedVehicleMake?: string;
+  assignedVehicleColour?: string;
+  assignedVehicleRegistration?: string;
+  assignmentStatus?: "NOT_ASSIGNED" | "ASSIGNED" | "DETAILS_SENT" | "FAILED_TO_SEND";
+  driverDetailsSentAt?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
   squarePaymentId?: string;
@@ -158,7 +167,31 @@ export default function AccountQuoteDetail() {
           <p className="text-lg font-semibold">Payment received</p>
           <p>Paid amount: {formatMoney(quote.paymentAmount ?? model.confirmedAmount, quote.paymentCurrency || model.confirmedCurrency)}</p>
           <p>Paid at: {formatUkDateTime(quote.paidAt)}</p>
-          <p>We&apos;ll confirm final driver/booking details shortly.</p>
+          {!quote.assignedDriverId ? <p>We&apos;ll send your driver details once assigned.</p> : null}
+          {(quote.assignmentStatus === "DETAILS_SENT" || quote.driverDetailsSentAt) && quote.assignedDriverId ? <p>Driver details sent.</p> : null}
+        </article>
+      ) : null}
+
+      {model.isPaid && quote.assignedDriverId && (quote.assignmentStatus === "DETAILS_SENT" || quote.driverDetailsSentAt) ? (
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 text-sm space-y-3">
+          <p className="text-lg font-semibold">Your driver details</p>
+          <div className="flex items-start gap-4">
+            <div className="h-24 w-24 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+              {quote.assignedDriverPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={quote.assignedDriverPhotoUrl} alt={quote.assignedDriverName || "Assigned driver"} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-slate-500">No photo</div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <p><strong>Driver:</strong> {quote.assignedDriverName || "Not provided"}</p>
+              <p><strong>Telephone:</strong> {quote.assignedDriverPhone || "Not provided"}</p>
+              <p><strong>Car:</strong> {quote.assignedVehicleMake || "Not provided"}</p>
+              <p><strong>Registration:</strong> {quote.assignedVehicleRegistration || "Not provided"}</p>
+            </div>
+          </div>
+          <p>Please keep these details available for your journey.</p>
         </article>
       ) : null}
 

@@ -1,91 +1,147 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { formatUkDateTime } from "@/lib/formatting";
 
-interface DriverListItem {
-  profile: { id: string; name: string; email: string; status: string };
-  missingDocuments: string[];
-  expiredDocuments: string[];
-}
-
-interface ReminderSummary {
-  driversScanned: number;
-  remindersSent: number;
-  missingOnboardingRemindersSent: number;
-  expiryWarningsSent: number;
-  expiredDocumentAlertsSent: number;
-  documentsMarkedExpired: number;
-  duplicateRemindersSkipped: number;
-}
+type DriverListItem = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  photoUrl?: string | null;
+  carMake: string;
+  carModel?: string;
+  carColour?: string;
+  registrationNumber: string;
+  isActive: boolean;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export default function AdminDriversPage() {
   const [drivers, setDrivers] = useState<DriverListItem[]>([]);
-  const [running, setRunning] = useState(false);
-  const [runError, setRunError] = useState("");
-  const [summary, setSummary] = useState<ReminderSummary | null>(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function loadDrivers() {
+    const res = await fetch("/api/admin/drivers", { cache: "no-store" });
+    const data = (await res.json()) as { drivers?: DriverListItem[]; message?: string };
+    if (!res.ok) {
+      setError(data.message || "Unable to load drivers.");
+      return;
+    }
+    setDrivers(data.drivers || []);
+  }
 
   useEffect(() => {
-    fetch("/api/admin/drivers").then(async (res) => {
-      const data = (await res.json()) as { drivers?: DriverListItem[] };
-      if (res.ok) setDrivers(data.drivers || []);
-    });
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/drivers", { cache: "no-store" });
+        const data = (await res.json()) as { drivers?: DriverListItem[]; message?: string };
+        if (!active) return;
+        if (!res.ok) {
+          setError(data.message || "Unable to load drivers.");
+          return;
+        }
+        setDrivers(data.drivers || []);
+      } catch {
+        if (active) setError("Unable to load drivers.");
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  async function runReminders() {
-    setRunning(true);
-    setRunError("");
-    setSummary(null);
+  async function createDriver(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError("");
+
+    const fd = new FormData(event.currentTarget);
+    const payload = {
+      name: String(fd.get("name") || "").trim(),
+      email: String(fd.get("email") || "").trim(),
+      phone: String(fd.get("phone") || "").trim(),
+      photoUrl: String(fd.get("photoUrl") || "").trim(),
+      carMake: String(fd.get("carMake") || "").trim(),
+      carModel: String(fd.get("carModel") || "").trim(),
+      carColour: String(fd.get("carColour") || "").trim(),
+      registrationNumber: String(fd.get("registrationNumber") || "").trim(),
+      isActive: fd.get("isActive") === "on",
+    };
+
     try {
-      const res = await fetch("/api/admin/reminders/driver-compliance/run", { method: "POST" });
-      const data = (await res.json()) as { success?: boolean; message?: string; summary?: ReminderSummary };
-      if (!res.ok || !data.success || !data.summary) {
-        setRunError(data.message || "Failed to run reminders.");
+      const res = await fetch("/api/admin/drivers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Could not create driver.");
         return;
       }
-      setSummary(data.summary);
+      (event.currentTarget as HTMLFormElement).reset();
+      await loadDrivers();
     } catch {
-      setRunError("Failed to run reminders.");
+      setError("Could not create driver.");
     } finally {
-      setRunning(false);
+      setSaving(false);
     }
   }
 
   return (
     <section className="space-y-6">
-      <h1 className="text-3xl font-bold">Admin Drivers</h1>
-      <article className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-        <h2 className="text-lg font-semibold">Driver compliance reminders</h2>
-        <p className="mt-1 text-slate-600">Manual trigger for Phase 3. Scheduled automation will be added later.</p>
-        <button
-          type="button"
-          onClick={runReminders}
-          disabled={running}
-          className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-500"
-        >
-          {running ? "Running..." : "Run driver compliance reminders"}
-        </button>
-        {runError && <p className="mt-2 text-red-700">{runError}</p>}
-        {summary && (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <p>Drivers scanned: {summary.driversScanned}</p>
-            <p>Reminders sent: {summary.remindersSent}</p>
-            <p>Missing onboarding reminders: {summary.missingOnboardingRemindersSent}</p>
-            <p>Expiry warnings: {summary.expiryWarningsSent}</p>
-            <p>Expired alerts: {summary.expiredDocumentAlertsSent}</p>
-            <p>Documents marked expired: {summary.documentsMarkedExpired}</p>
-            <p>Duplicates skipped: {summary.duplicateRemindersSkipped}</p>
-          </div>
-        )}
-      </article>
+      <h1 className="text-3xl font-bold">Driver management</h1>
+
+      <form onSubmit={createDriver} className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
+        <h2 className="text-lg font-semibold">Add driver</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input name="name" required placeholder="Driver name" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="email" required type="email" placeholder="Driver email" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="phone" required placeholder="Driver telephone" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="photoUrl" placeholder="Driver photograph URL" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="carMake" required placeholder="Car make" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="carModel" placeholder="Car model" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="carColour" placeholder="Car colour" className="rounded border border-slate-300 px-3 py-2" />
+          <input name="registrationNumber" required placeholder="Registration number" className="rounded border border-slate-300 px-3 py-2" />
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input name="isActive" type="checkbox" defaultChecked /> Active
+        </label>
+        <div>
+          <button disabled={saving} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-60">{saving ? "Saving..." : "Add driver"}</button>
+        </div>
+      </form>
+
+      {error ? <p className="text-red-700 text-sm">{error}</p> : null}
+
       <ul className="space-y-3">
-        {drivers.map((item) => (
-          <li key={item.profile.id} className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-            <p><strong>{item.profile.name}</strong> ({item.profile.email})</p>
-            <p>Status: {item.profile.status}</p>
-            <p>Missing docs: {item.missingDocuments.length ? item.missingDocuments.join(", ") : "None"}</p>
-            <p>Expired docs: {item.expiredDocuments.length ? item.expiredDocuments.join(", ") : "None"}</p>
-            <Link href={`/admin/drivers/${item.profile.id}`} className="mt-2 inline-block underline">Review driver</Link>
+        {drivers.map((driver) => (
+          <li key={driver.id} className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                {driver.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={driver.photoUrl} alt={driver.name} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-slate-500">No photo</div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="font-semibold">{driver.name}</p>
+                <p>{driver.phone} • {driver.email}</p>
+                <p>{[driver.carColour, driver.carMake, driver.carModel].filter(Boolean).join(" ")} • {driver.registrationNumber}</p>
+                <p>Status: {driver.isActive ? "Active" : "Inactive"}</p>
+                <p className="text-xs text-slate-500">Created {formatUkDateTime(driver.createdAt)} • Updated {formatUkDateTime(driver.updatedAt)}</p>
+              </div>
+              <Link href={`/admin/drivers/${driver.id}`} className="rounded border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700">Edit</Link>
+            </div>
           </li>
         ))}
       </ul>

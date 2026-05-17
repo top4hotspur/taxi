@@ -140,6 +140,39 @@ export function adminPaymentReceivedEmail(quote: QuoteRecord) {
   };
 }
 
+export function customerDriverDetailsEmail(quote: QuoteRecord, recipientName?: string) {
+  const displayName = recipientName || quote.guestName || "Customer";
+  const journey = `${quote.pickupLocation} -> ${quote.dropoffLocation}`;
+  const returnLine = quote.returnJourney || quote.returnJourneyNeeded
+    ? `Return: ${quote.returnPickup || "Not provided"} -> ${quote.returnDropoff || "Not provided"} (${quote.returnDate || "Not provided"} ${quote.returnTime || ""})`
+    : "Return: No";
+  const driverPhoto = quote.assignedDriverPhotoUrl ? `Driver photo: ${quote.assignedDriverPhotoUrl}\n` : "";
+  return {
+    subject: "Your NI Taxi Co driver details",
+    text: `Hi ${displayName},\n\nYour driver details are now available.\n\nJourney:\n${journey}\nDate/time: ${quote.pickupDate} ${quote.pickupTime}\n${returnLine}\n\nDriver:\nName: ${quote.assignedDriverName || "Not provided"}\nPhone: ${quote.assignedDriverPhone || "Not provided"}\nCar: ${quote.assignedVehicleMake || "Not provided"}\nRegistration: ${quote.assignedVehicleRegistration || "Not provided"}\n${driverPhoto}\nPlease keep these details available for your journey.\n\n${emailFooter()}`,
+  };
+}
+
+export function driverJobDetailsEmail(quote: QuoteRecord) {
+  const customerName = quote.guestName || quote.passengerName || "Not provided";
+  const customerPhone = quote.guestPhone || quote.passengerPhone || "Not provided";
+  const leadPassengerLine = quote.leadPassengerSameAsBooker === false
+    ? `Lead passenger: ${quote.leadPassengerName || "Not provided"} / ${quote.leadPassengerPhone || "Not provided"} / ${quote.leadPassengerEmail || "Not provided"}`
+    : "Lead passenger: Same as booker";
+  const luggage = [
+    (quote.handLuggageCount ?? 0) > 0 ? `Hand luggage: ${quote.handLuggageCount}` : null,
+    (quote.suitcaseCount ?? 0) > 0 ? `Suitcases: ${quote.suitcaseCount}` : null,
+    (quote.oversizeItemCount ?? quote.golfBags ?? 0) > 0 ? `Oversize items: ${quote.oversizeItemCount ?? quote.golfBags}` : null,
+  ].filter(Boolean).join(", ") || "No luggage declared";
+  const returnLine = quote.returnJourney || quote.returnJourneyNeeded
+    ? `Return journey:\nPickup: ${quote.returnPickup || "Not provided"}\nDrop-off: ${quote.returnDropoff || "Not provided"}\nDate/time: ${quote.returnDate || "Not provided"} ${quote.returnTime || ""}`
+    : "Return journey: No";
+  return {
+    subject: "NI Taxi Co job details",
+    text: `Job details:\n\nPickup date/time: ${quote.pickupDate} ${quote.pickupTime}\nPickup: ${quote.pickupLocation}\nDrop-off: ${quote.dropoffLocation}\n${returnLine}\n\nCustomer/booker: ${customerName}\nCustomer phone: ${customerPhone}\n${leadPassengerLine}\nPassengers: ${quote.passengers}\nLuggage: ${luggage}\nSpecial requests: ${quote.itineraryMessage || "Not provided"}\nAdmin notes: ${quote.adminNotes || "Not provided"}\n\n${emailFooter()}`,
+  };
+}
+
 export function driverMissingComplianceReminderEmail(params: {
   driverName: string;
   missingProfileFields: string[];

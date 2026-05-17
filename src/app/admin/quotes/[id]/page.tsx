@@ -16,6 +16,23 @@ type Quote = {
   confirmedCurrency?: string;
   quotedAt?: string;
   quoteExpiresAt?: string;
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
+  assignedDriverEmail?: string;
+  assignedDriverPhotoUrl?: string;
+  assignedVehicleMake?: string;
+  assignedVehicleColour?: string;
+  assignedVehicleRegistration?: string;
+  assignedAt?: string;
+  assignmentStatus?: "NOT_ASSIGNED" | "ASSIGNED" | "DETAILS_SENT" | "FAILED_TO_SEND";
+  driverDetailsSentAt?: string;
+  driverJobSentAt?: string;
+  customerDriverEmailSentAt?: string;
+  customerDriverSmsSentAt?: string;
+  driverJobEmailSentAt?: string;
+  driverJobSmsSentAt?: string;
+  lastCommunicationError?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
   squarePaymentId?: string;
@@ -78,6 +95,18 @@ type Quote = {
   updatedAt: string;
 };
 
+type DriverOption = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
+  carMake: string;
+  carModel?: string;
+  carColour?: string;
+  registrationNumber: string;
+};
+
 const ADMIN_STATUS_OPTIONS: Array<{ label: string; value: QuoteStatusValue }> = [
   { label: "Awaiting confirmation", value: "AWAITING_CONFIRMATION" },
   { label: "Quoted", value: "QUOTED" },
@@ -118,6 +147,18 @@ export default function AdminQuoteDetailPage() {
   const [error, setError] = useState("");
   const [banner, setBanner] = useState<{ tone: "success" | "warning" | "error"; message: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [drivers, setDrivers] = useState<DriverOption[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState("");
+  const [notifyResult, setNotifyResult] = useState<{
+    message: string;
+    summary: {
+      customerEmail: string;
+      customerSms: string;
+      driverEmail: string;
+      driverSms: string;
+      detailMessages: string[];
+    };
+  } | null>(null);
 
   useEffect(() => {
     const id = params.id;
@@ -129,8 +170,18 @@ export default function AdminQuoteDetailPage() {
         return;
       }
       setQuote(data.quote);
+      setSelectedDriverId(data.quote?.assignedDriverId || "");
     }).catch(() => setError("Unable to load quote"));
   }, [params.id]);
+
+  useEffect(() => {
+    fetch("/api/admin/drivers?activeOnly=true", { cache: "no-store" }).then(async (res) => {
+      const data = await res.json();
+      if (!res.ok) return;
+      const list = Array.isArray(data.drivers) ? data.drivers as DriverOption[] : [];
+      setDrivers(list.filter((d) => d.isActive));
+    }).catch(() => undefined);
+  }, []);
 
   const luggageLines = useMemo(() => {
     if (!quote) return [] as string[];
@@ -150,6 +201,7 @@ export default function AdminQuoteDetailPage() {
     setSaving(true);
     setError("");
     setBanner(null);
+    setNotifyResult(null);
     const fd = new FormData(event.currentTarget);
     const payload = {
       adminNotes: fd.get("adminNotes"),
@@ -195,6 +247,7 @@ export default function AdminQuoteDetailPage() {
     setSaving(true);
     setError("");
     setBanner(null);
+    setNotifyResult(null);
     try {
       const res = await fetch(`/api/admin/quotes/${quote.id}`, {
         method: "PATCH",
@@ -226,6 +279,73 @@ export default function AdminQuoteDetailPage() {
   const normalizedStatus = normalizeQuoteStatus(quote.status);
   const displayStatus = normalizedStatus === "SUBMITTED" ? "Awaiting review" : getQuoteStatusLabel(normalizedStatus);
   const showReturn = Boolean(quote.returnJourney || quote.returnJourneyNeeded);
+  const isPaid = quote.paymentStatus === "PAID";
+
+  async function assignDriver() {
+    if (!quote || !selectedDriverId || saving) return;
+    setSaving(true);
+    setError("");
+    setBanner(null);
+    setNotifyResult(null);
+    try {
+      const res = await fetch(`/api/admin/quotes/${quote.id}/assign-driver`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driverId: selectedDriverId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const message = data.message || "Could not assign driver.";
+        setError(message);
+        setBanner({ tone: "error", message });
+        return;
+      }
+      setQuote(data.quote);
+      setBanner({ tone: "success", message: "Driver assigned." });
+    } catch {
+      setError("Could not assign driver.");
+      setBanner({ tone: "error", message: "Could not assign driver." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendDriverDetails() {
+    if (!quote || saving) return;
+    setSaving(true);
+    setError("");
+    setBanner(null);
+    setNotifyResult(null);
+    try {
+      const res = await fetch(`/api/admin/quotes/${quote.id}/send-driver-details`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const message = data.message || "Could not send details.";
+        setError(message);
+        setBanner({ tone: "error", message });
+        return;
+      }
+      setQuote(data.quote);
+      setNotifyResult({ message: data.message, summary: data.notificationSummary });
+      const hasFailed = ["failed"].some((status) => [
+        data.notificationSummary?.customerEmail,
+        data.notificationSummary?.customerSms,
+        data.notificationSummary?.driverEmail,
+        data.notificationSummary?.driverSms,
+      ].includes(status));
+      setBanner({
+        tone: hasFailed ? "warning" : "success",
+        message: data.message || (hasFailed ? "Some messages could not be sent. Please review below." : "Driver and customer details sent."),
+      });
+    } catch {
+      setError("Could not send details.");
+      setBanner({ tone: "error", message: "Could not send details." });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <section className="space-y-6">
@@ -324,6 +444,44 @@ export default function AdminQuoteDetailPage() {
           {quote.squarePaymentId ? fieldRow("Square payment ID", quote.squarePaymentId) : null}
           {quote.paymentStatus === "PAYMENT_FAILED" && quote.paymentFailureReason ? fieldRow("Failure reason", quote.paymentFailureReason) : null}
         </>)}
+
+        {sectionCard("Driver assignment", <>
+          {fieldRow("Assignment status", quote.assignmentStatus || "NOT_ASSIGNED")}
+          {fieldRow("Assigned driver", quote.assignedDriverName || "Not assigned")}
+          {quote.assignedVehicleMake ? fieldRow("Assigned vehicle", `${quote.assignedVehicleMake}${quote.assignedVehicleRegistration ? ` • ${quote.assignedVehicleRegistration}` : ""}`) : null}
+          {quote.assignedAt ? fieldRow("Assigned at", formatUkDateTime(quote.assignedAt)) : null}
+          {quote.driverDetailsSentAt ? fieldRow("Customer details sent", formatUkDateTime(quote.driverDetailsSentAt)) : null}
+          {quote.driverJobSentAt ? fieldRow("Driver job sent", formatUkDateTime(quote.driverJobSentAt)) : null}
+          {quote.customerDriverEmailSentAt ? fieldRow("Customer email sent", formatUkDateTime(quote.customerDriverEmailSentAt)) : null}
+          {quote.customerDriverSmsSentAt ? fieldRow("Customer SMS sent", formatUkDateTime(quote.customerDriverSmsSentAt)) : null}
+          {quote.driverJobEmailSentAt ? fieldRow("Driver email sent", formatUkDateTime(quote.driverJobEmailSentAt)) : null}
+          {quote.driverJobSmsSentAt ? fieldRow("Driver SMS sent", formatUkDateTime(quote.driverJobSmsSentAt)) : null}
+          {quote.lastCommunicationError ? fieldRow("Last communication error", quote.lastCommunicationError) : null}
+
+          {isPaid ? (
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <label className="block text-sm font-medium text-slate-700">Select active driver</label>
+              <select
+                value={selectedDriverId}
+                onChange={(event) => setSelectedDriverId(event.target.value)}
+                className="w-full rounded border border-slate-300 px-3 py-2"
+              >
+                <option value="">Choose driver…</option>
+                {drivers.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.name} • {driver.phone} • {[driver.carColour, driver.carMake, driver.carModel].filter(Boolean).join(" ")} {driver.registrationNumber ? `(${driver.registrationNumber})` : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={saving || !selectedDriverId} onClick={assignDriver} className="rounded bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">Assign driver</button>
+                <button type="button" disabled={saving || !quote.assignedDriverId} onClick={sendDriverDetails} className="rounded bg-indigo-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">Send driver/customer details</button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-600">Driver assignment becomes available after payment is received.</p>
+          )}
+        </>)}
       </div>
 
       <form onSubmit={update} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -348,6 +506,25 @@ export default function AdminQuoteDetailPage() {
         <button disabled={saving} onClick={() => action("mark_declined")} className="rounded bg-red-700 px-4 py-2 text-white disabled:opacity-60">Set Declined</button>
         <button disabled={saving} onClick={() => action("mark_cancelled")} className="rounded bg-slate-500 px-4 py-2 text-white disabled:opacity-60">Set Cancelled</button>
       </div>
+
+      {notifyResult ? (
+        <article className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+          <h3 className="font-semibold text-slate-900">Notification results</h3>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2">
+            <p>Customer email: {notifyResult.summary.customerEmail}</p>
+            <p>Customer SMS: {notifyResult.summary.customerSms}</p>
+            <p>Driver email: {notifyResult.summary.driverEmail}</p>
+            <p>Driver SMS: {notifyResult.summary.driverSms}</p>
+          </div>
+          {notifyResult.summary.detailMessages.length > 0 ? (
+            <ul className="mt-2 list-disc pl-5 text-xs text-slate-600">
+              {notifyResult.summary.detailMessages.map((message, index) => (
+                <li key={`${index}-${message}`}>{message}</li>
+              ))}
+            </ul>
+          ) : null}
+        </article>
+      ) : null}
     </section>
   );
 }

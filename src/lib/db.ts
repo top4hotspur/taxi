@@ -111,6 +111,23 @@ export interface QuoteRecord {
   confirmedCurrency?: string;
   quotedAt?: string;
   quoteExpiresAt?: string;
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
+  assignedDriverEmail?: string;
+  assignedDriverPhotoUrl?: string;
+  assignedVehicleMake?: string;
+  assignedVehicleColour?: string;
+  assignedVehicleRegistration?: string;
+  assignedAt?: string;
+  assignmentStatus?: "NOT_ASSIGNED" | "ASSIGNED" | "DETAILS_SENT" | "FAILED_TO_SEND";
+  driverDetailsSentAt?: string;
+  driverJobSentAt?: string;
+  customerDriverEmailSentAt?: string;
+  customerDriverSmsSentAt?: string;
+  driverJobEmailSentAt?: string;
+  driverJobSmsSentAt?: string;
+  lastCommunicationError?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
   squarePaymentId?: string;
@@ -150,6 +167,7 @@ export interface DriverProfileRecord {
   name: string;
   email: string;
   mobile: string;
+  photoUrl?: string | null;
   addressLine1: string;
   addressLine2?: string | null;
   city: string;
@@ -158,9 +176,11 @@ export interface DriverProfileRecord {
   country: string;
   carMake: string;
   carModel: string;
+  carColour?: string | null;
   registrationNumber: string;
   passengerCapacity: number;
   suitcaseCapacity: number;
+  isActive?: boolean;
   profilePhoto?: string | null;
   status: "PENDING" | "INCOMPLETE" | "ACTIVE" | "SUSPENDED";
   createdAt: string;
@@ -750,6 +770,82 @@ export const db = {
     }
 
     return records;
+  },
+
+  async createAdminDriverProfile(
+    input: Pick<
+      DriverProfileRecord,
+      | "name"
+      | "email"
+      | "mobile"
+      | "photoUrl"
+      | "carMake"
+      | "carModel"
+      | "carColour"
+      | "registrationNumber"
+      | "isActive"
+    >,
+    options?: { correlationId?: string }
+  ) {
+    assertDbWriteConfig();
+    const nowIso = now();
+    const profileId = id();
+    const syntheticUserId = `driver-${profileId}`;
+    const record: DriverProfileRecord = {
+      id: profileId,
+      userId: syntheticUserId,
+      name: input.name,
+      email: input.email,
+      mobile: input.mobile,
+      photoUrl: input.photoUrl ?? null,
+      addressLine1: "",
+      addressLine2: null,
+      city: "",
+      region: "",
+      postalCode: "",
+      country: "",
+      carMake: input.carMake,
+      carModel: input.carModel,
+      carColour: input.carColour ?? null,
+      registrationNumber: input.registrationNumber,
+      passengerCapacity: 0,
+      suitcaseCapacity: 0,
+      isActive: input.isActive ?? true,
+      profilePhoto: input.photoUrl ?? null,
+      status: (input.isActive ?? true) ? "ACTIVE" : "SUSPENDED",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    await putWithDiagnostics(record, {
+      correlationId: options?.correlationId,
+      operation: "createAdminDriverProfile",
+      tableEnvVar: "DDB_TABLE_DRIVER_PROFILES",
+      tableName: TABLE_DRIVER_PROFILES,
+    });
+    return record;
+  },
+
+  async updateDriverProfileById(
+    profileId: string,
+    patch: Partial<DriverProfileRecord>,
+    options?: { correlationId?: string },
+  ) {
+    assertDbWriteConfig();
+    const existing = await this.getDriverProfileById(profileId);
+    if (!existing) return null;
+    const next: DriverProfileRecord = {
+      ...existing,
+      ...patch,
+      updatedAt: now(),
+    };
+    await putWithDiagnostics(next, {
+      correlationId: options?.correlationId,
+      operation: "updateDriverProfileById",
+      tableEnvVar: "DDB_TABLE_DRIVER_PROFILES",
+      tableName: TABLE_DRIVER_PROFILES,
+    });
+    return next;
   },
 
   async listPricingDateUplifts() {

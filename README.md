@@ -67,6 +67,10 @@ Set these in Amplify Hosting (and locally for real sending):
 - `SQUARE_ENVIRONMENT=sandbox` (or `production`)
 - `NEXT_PUBLIC_SQUARE_APPLICATION_ID`
 - `NEXT_PUBLIC_SQUARE_LOCATION_ID`
+- `TWILIO_ACCOUNT_SID` (optional, SMS)
+- `TWILIO_AUTH_TOKEN` (optional, SMS)
+- `TWILIO_FROM_NUMBER` (optional, SMS)
+- `DRIVER_PHOTOS_BUCKET` (optional, for future S3 photo upload path)
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
 

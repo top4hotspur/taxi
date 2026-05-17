@@ -66,6 +66,11 @@ export async function GET() {
     (squareEnvironment === "production" && productionAppId);
   const squareServerConfigured = squareModeValid && squareAccessTokenPresent && squareLocationIdPresent;
   const squareClientConfigured = squareApplicationIdPresent && squareClientLocationIdPresent && squareModeAppIdMatch;
+  const twilioAccountSidPresent = Boolean(process.env.TWILIO_ACCOUNT_SID?.trim());
+  const twilioAuthTokenPresent = Boolean(process.env.TWILIO_AUTH_TOKEN?.trim());
+  const twilioFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
+  const smsConfigured = twilioAccountSidPresent && twilioAuthTokenPresent && twilioFromNumberPresent;
+  const driverPhotosBucketPresent = Boolean(process.env.DRIVER_PHOTOS_BUCKET?.trim());
 
   return NextResponse.json({
     ok: true,
@@ -102,5 +107,10 @@ export async function GET() {
     squareServerConfigured,
     squareClientConfigured,
     squareModeAppIdMatch,
+    smsConfigured,
+    twilioAccountSidPresent,
+    twilioAuthTokenPresent,
+    twilioFromNumberPresent,
+    driverPhotosBucketPresent,
   });
 }
