@@ -1,8 +1,31 @@
-﻿"use client";
+"use client";
 
+import Link from "next/link";
 import { ChangeEvent, DragEvent, useMemo, useRef, useState } from "react";
 
 type UploadResult = { photoKey: string; photoUrl: string };
+
+type UploadDiagnostics = {
+  bucketConfigured?: boolean;
+  bucketNamePresent?: boolean;
+  bucketName?: string | null;
+  region?: string;
+  fileReceived?: boolean;
+  fileMimeType?: string;
+  fileSizeBytes?: number;
+  s3ErrorName?: string | null;
+  s3ErrorCode?: string | null;
+  s3StatusCode?: number | null;
+};
+
+type UploadErrorResponse = {
+  ok?: boolean;
+  errorCode?: string;
+  message?: string;
+  photoKey?: string;
+  photoUrl?: string;
+  diagnostics?: UploadDiagnostics;
+};
 
 type Props = {
   value: UploadResult | null;
@@ -16,6 +39,8 @@ export default function DriverPhotoUploader({ value, onChange }: Props) {
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadDiagnostics, setUploadDiagnostics] = useState<UploadDiagnostics | null>(null);
+  const [uploadErrorCode, setUploadErrorCode] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const previewUrl = value?.photoUrl || "";
@@ -24,13 +49,15 @@ export default function DriverPhotoUploader({ value, onChange }: Props) {
 
   async function handleFile(file?: File | null) {
     setError("");
+    setUploadDiagnostics(null);
+    setUploadErrorCode(null);
     if (!file) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setError("Only JPG, PNG or WebP images are allowed.");
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
-      setError("Photo must be 5MB or smaller.");
+      setError("Photo is too large. Maximum size is 5MB.");
       return;
     }
 
@@ -39,9 +66,11 @@ export default function DriverPhotoUploader({ value, onChange }: Props) {
       const formData = new FormData();
       formData.append("photo", file);
       const res = await fetch("/api/admin/drivers/photo", { method: "POST", body: formData });
-      const data = (await res.json()) as { ok?: boolean; photoKey?: string; photoUrl?: string; message?: string };
+      const data = (await res.json()) as UploadErrorResponse;
       if (!res.ok || !data.ok || !data.photoKey || !data.photoUrl) {
         setError(data.message || "Driver photo upload failed. Please try again.");
+        setUploadDiagnostics(data.diagnostics || null);
+        setUploadErrorCode(data.errorCode || null);
         return;
       }
       onChange({ photoKey: data.photoKey, photoUrl: data.photoUrl });
@@ -99,7 +128,27 @@ export default function DriverPhotoUploader({ value, onChange }: Props) {
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p>{error}</p>
+          <p className="text-xs">
+            <Link href="/api/admin/health/driver-photo-storage-test" target="_blank" className="underline underline-offset-2">
+              Check driver photo storage health
+            </Link>
+          </p>
+          {(uploadErrorCode || uploadDiagnostics) ? (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-red-700">Show debug details</summary>
+              <div className="mt-2 space-y-1">
+                <p>Error code: {uploadErrorCode || "N/A"}</p>
+                <p>Region: {uploadDiagnostics?.region || "N/A"}</p>
+                <p>Bucket configured: {uploadDiagnostics?.bucketConfigured ? "Yes" : "No"}</p>
+                <p>S3 error code: {uploadDiagnostics?.s3ErrorCode || uploadDiagnostics?.s3ErrorName || "N/A"}</p>
+              </div>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

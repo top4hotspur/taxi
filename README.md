@@ -139,6 +139,17 @@ Diagnostics:
 - Admin health: `GET /api/admin/health` includes `driverPhotosBucketName`, `driverPhotoUploadConfigured`, and `driverPhotoStorageCheck`.
 - Storage test endpoint: `GET /api/admin/health/driver-photo-storage-test` (admin only, temporary) verifies Put/Delete access with a diagnostic test object.
 
+Driver photo upload troubleshooting:
+1. Confirm Amplify env var: `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos`
+2. Confirm bucket exists in `eu-west-2`
+3. Confirm `APP_AWS_REGION=eu-west-2`
+4. Confirm runtime IAM permissions include:
+   - `s3:PutObject`
+   - `s3:GetObject`
+   - `s3:DeleteObject`
+   on `arn:aws:s3:::ni-taxi-driver-photos/*`
+5. Open `GET /api/admin/health/driver-photo-storage-test` as admin and review safe diagnostics.
+
 ### 6) Google Maps Places Autocomplete setup
 1. Create a Google Cloud project.
 2. Enable `Maps JavaScript API`.
