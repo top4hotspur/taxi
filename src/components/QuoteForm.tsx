@@ -7,6 +7,11 @@ import PlaceAutocompleteInput from "@/components/PlaceAutocompleteInput";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
 
 const serviceTypes = ["Airport Transfer", "Golf Transfer", "Tourist Day Trip", "Event Transport", "Other"];
+const quickLocations = [
+  { label: "Belfast International - BFS", value: "Belfast International Airport, Crumlin, UK" },
+  { label: "City Airport - BHD", value: "Belfast City Airport, Sydenham By-Pass, Belfast, UK" },
+  { label: "Grand Central Station", value: "Belfast BT12 5AP, UK" },
+];
 const pricingRelevantFields = new Set([
   "pickupLocation", "dropoffLocation", "pickupDate", "pickupTime", "passengers", "returnJourney",
   "returnPickupLocation", "returnDropoffLocation", "returnDate", "returnTime", "handLuggageCount", "suitcaseCount", "oversizeItemCount", "serviceType",
@@ -89,6 +94,36 @@ export default function QuoteForm() {
     if (returnPickup) returnPickup.value = outwardDropoff;
     if (returnDropoff) returnDropoff.value = outwardPickup;
     setFormState((current) => ({ ...current, returnPickupLocation: outwardDropoff, returnDropoffLocation: outwardPickup }));
+  }
+
+  function setFieldValue(name: string, value: string) {
+    if (!formRef.current) return;
+    const input = formRef.current.querySelector<HTMLInputElement>(`[name="${name}"]`);
+    if (input) input.value = value;
+  }
+
+  function applyQuickLocation(params: {
+    locationField: string;
+    placeIdField: string;
+    addressField: string;
+    latField: string;
+    lngField: string;
+    value: string;
+  }) {
+    setFieldValue(params.locationField, params.value);
+    setFieldValue(params.placeIdField, "");
+    setFieldValue(params.addressField, "");
+    setFieldValue(params.latField, "");
+    setFieldValue(params.lngField, "");
+    setFormState((current) => ({
+      ...current,
+      [params.locationField]: params.value,
+      [params.placeIdField]: "",
+      [params.addressField]: "",
+      [params.latField]: "",
+      [params.lngField]: "",
+    }));
+    markPotentiallyStale(params.locationField);
   }
 
   async function calculateEstimate() {
@@ -264,8 +299,62 @@ export default function QuoteForm() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">Journey details</h2>
         <div className="grid gap-5 sm:grid-cols-2">
-          <PlaceAutocompleteInput label="Outward pickup location" required locationNameField="pickupLocation" placeIdField="pickupPlaceId" addressField="pickupAddress" latField="pickupLat" lngField="pickupLng" />
-          <PlaceAutocompleteInput label="Outward drop-off location" required locationNameField="dropoffLocation" placeIdField="dropoffPlaceId" addressField="dropoffAddress" latField="dropoffLat" lngField="dropoffLng" />
+          <div className="space-y-2">
+            <PlaceAutocompleteInput label="Outward pickup location" required locationNameField="pickupLocation" placeIdField="pickupPlaceId" addressField="pickupAddress" latField="pickupLat" lngField="pickupLng" />
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">Quick select:</p>
+              <div className="flex flex-wrap gap-2">
+                {quickLocations.map((location) => (
+                  <button
+                    key={`pickup-${location.label}`}
+                    type="button"
+                    aria-label={`Set pickup location to ${location.label}`}
+                    onClick={() =>
+                      applyQuickLocation({
+                        locationField: "pickupLocation",
+                        placeIdField: "pickupPlaceId",
+                        addressField: "pickupAddress",
+                        latField: "pickupLat",
+                        lngField: "pickupLng",
+                        value: location.value,
+                      })
+                    }
+                    className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                  >
+                    {location.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <PlaceAutocompleteInput label="Outward drop-off location" required locationNameField="dropoffLocation" placeIdField="dropoffPlaceId" addressField="dropoffAddress" latField="dropoffLat" lngField="dropoffLng" />
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">Quick select:</p>
+              <div className="flex flex-wrap gap-2">
+                {quickLocations.map((location) => (
+                  <button
+                    key={`dropoff-${location.label}`}
+                    type="button"
+                    aria-label={`Set drop-off location to ${location.label}`}
+                    onClick={() =>
+                      applyQuickLocation({
+                        locationField: "dropoffLocation",
+                        placeIdField: "dropoffPlaceId",
+                        addressField: "dropoffAddress",
+                        latField: "dropoffLat",
+                        lngField: "dropoffLng",
+                        value: location.value,
+                      })
+                    }
+                    className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                  >
+                    {location.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
           <InputField label="Outward date" name="pickupDate" type="date" required />
           <InputField label="Outward time" name="pickupTime" type="time" required />
           <SelectField label="Service type" name="serviceType" options={serviceTypes} required />
@@ -280,8 +369,62 @@ export default function QuoteForm() {
           <p className="text-sm text-slate-600">We&apos;ll pre-fill the return route as the reverse of your outward journey. You can change it if needed.</p>
           <button type="button" onClick={resetReturnToReverse} className="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-100">Reset to reverse outward route</button>
           <div className="grid gap-5 sm:grid-cols-2">
-            <PlaceAutocompleteInput label="Return pickup location" required locationNameField="returnPickupLocation" placeIdField="returnPickupPlaceId" addressField="returnPickupAddress" latField="returnPickupLat" lngField="returnPickupLng" defaultValueFieldName="dropoffLocation" />
-            <PlaceAutocompleteInput label="Return drop-off location" required locationNameField="returnDropoffLocation" placeIdField="returnDropoffPlaceId" addressField="returnDropoffAddress" latField="returnDropoffLat" lngField="returnDropoffLng" defaultValueFieldName="pickupLocation" />
+            <div className="space-y-2">
+              <PlaceAutocompleteInput label="Return pickup location" required locationNameField="returnPickupLocation" placeIdField="returnPickupPlaceId" addressField="returnPickupAddress" latField="returnPickupLat" lngField="returnPickupLng" defaultValueFieldName="dropoffLocation" />
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Quick select:</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickLocations.map((location) => (
+                    <button
+                      key={`return-pickup-${location.label}`}
+                      type="button"
+                      aria-label={`Set return pickup location to ${location.label}`}
+                      onClick={() =>
+                        applyQuickLocation({
+                          locationField: "returnPickupLocation",
+                          placeIdField: "returnPickupPlaceId",
+                          addressField: "returnPickupAddress",
+                          latField: "returnPickupLat",
+                          lngField: "returnPickupLng",
+                          value: location.value,
+                        })
+                      }
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      {location.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <PlaceAutocompleteInput label="Return drop-off location" required locationNameField="returnDropoffLocation" placeIdField="returnDropoffPlaceId" addressField="returnDropoffAddress" latField="returnDropoffLat" lngField="returnDropoffLng" defaultValueFieldName="pickupLocation" />
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Quick select:</p>
+                <div className="flex flex-wrap gap-2">
+                  {quickLocations.map((location) => (
+                    <button
+                      key={`return-dropoff-${location.label}`}
+                      type="button"
+                      aria-label={`Set return drop-off location to ${location.label}`}
+                      onClick={() =>
+                        applyQuickLocation({
+                          locationField: "returnDropoffLocation",
+                          placeIdField: "returnDropoffPlaceId",
+                          addressField: "returnDropoffAddress",
+                          latField: "returnDropoffLat",
+                          lngField: "returnDropoffLng",
+                          value: location.value,
+                        })
+                      }
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      {location.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <InputField label="Return date" name="returnDate" type="date" required />
             <InputField label="Return time" name="returnTime" type="time" required />
           </div>
