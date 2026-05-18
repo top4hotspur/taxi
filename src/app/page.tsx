@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Private Taxi & Tour Transfers Across Northern Ireland",
   description:
     "Premium pre-booked airport transfers, golf transport, and private tours in Northern Ireland for visitors and tour operators.",
+  alternates: {
+    canonical: "/",
+  },
 };
 
 export default function Home() {
@@ -31,6 +34,8 @@ export default function Home() {
         <div className="mt-4 space-y-1">
           <p className="text-sm font-medium text-slate-700">Secure card payments processed by Square.</p>
           <p className="text-xs text-slate-500">We accept major debit and credit cards, including Visa, Mastercard and American Express.</p>
+          <p className="text-xs text-slate-600">NI Taxi Co • Service area: Northern Ireland • Private hire / pre-booked taxi and transfer services.</p>
+          <p className="text-xs text-slate-600">Contact: contact@nitaxico.com • 07440368474</p>
         </div>
       </section>
 

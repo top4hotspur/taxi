@@ -3,6 +3,9 @@
 export const metadata: Metadata = {
   title: "Terms & Conditions | NI Taxi Co",
   description: "NI Taxi Co terms and conditions for pre-booked private hire and transfer services.",
+  alternates: {
+    canonical: "/terms",
+  },
 };
 
 export default function TermsPage() {

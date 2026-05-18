@@ -46,6 +46,16 @@ export default function Footer() {
               </Link>
             </li>
             <li>
+              <Link href="/privacy" className="text-sm text-slate-600 hover:text-slate-900">
+                Privacy Policy
+              </Link>
+            </li>
+            <li>
+              <Link href="/contact" className="text-sm text-slate-600 hover:text-slate-900">
+                Contact
+              </Link>
+            </li>
+            <li>
               <Link href="/admin" className="text-sm text-slate-600 hover:text-slate-900">
                 Admin Login
               </Link>

@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     template: "%s | NI Taxi Co",
   },
   description: siteConfig.description,
+  alternates: {
+    canonical: "/",
+  },
   icons: {
     icon: [
       { url: "/favicon.png", type: "image/png" },

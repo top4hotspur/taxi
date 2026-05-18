@@ -3,6 +3,9 @@
 export const metadata: Metadata = {
   title: "Policies | NI Taxi Co",
   description: "NI Taxi Co booking and service policies for cancellations, waiting time, pricing, and privacy.",
+  alternates: {
+    canonical: "/policies",
+  },
 };
 
 export default function PoliciesPage() {
