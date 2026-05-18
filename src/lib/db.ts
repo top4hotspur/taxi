@@ -126,8 +126,14 @@ export interface QuoteRecord {
   driverJobSentAt?: string;
   customerDriverEmailSentAt?: string;
   customerDriverSmsSentAt?: string;
+  customerWhatsAppSentAt?: string;
+  customerWhatsAppStatus?: "SENT" | "SKIPPED" | "FAILED";
+  customerWhatsAppError?: string;
   driverJobEmailSentAt?: string;
   driverJobSmsSentAt?: string;
+  driverWhatsAppSentAt?: string;
+  driverWhatsAppStatus?: "SENT" | "SKIPPED" | "FAILED";
+  driverWhatsAppError?: string;
   lastCommunicationError?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";

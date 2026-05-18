@@ -70,6 +70,10 @@ Set these in Amplify Hosting (and locally for real sending):
 - `TWILIO_ACCOUNT_SID` (optional, SMS)
 - `TWILIO_AUTH_TOKEN` (optional, SMS)
 - `TWILIO_FROM_NUMBER` (optional, SMS)
+- `TWILIO_WHATSAPP_FROM` (optional, WhatsApp sender, e.g. `whatsapp:+447440368474`)
+- `ENABLE_WHATSAPP_NOTIFICATIONS=true|false`
+- `TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID` (optional)
+- `TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID` (optional)
 - `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos` (required for admin driver photo upload)
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
@@ -138,6 +142,20 @@ Temporary implementation:
 Diagnostics:
 - Admin health: `GET /api/admin/health` includes `driverPhotosBucketName`, `driverPhotoUploadConfigured`, and `driverPhotoStorageCheck`.
 - Storage test endpoint: `GET /api/admin/health/driver-photo-storage-test` (admin only, temporary) verifies Put/Delete access with a diagnostic test object.
+
+WhatsApp notifications:
+- Email remains the required delivery channel for driver/customer assignment details.
+- WhatsApp is attempted first when enabled/configured; SMS is only attempted as fallback if WhatsApp fails and `TWILIO_FROM_NUMBER` is configured.
+- Admin health includes:
+  - `twilioAccountSidPresent`
+  - `twilioAuthTokenPresent`
+  - `whatsappFromPresent`
+  - `whatsappNotificationsEnabled`
+  - `smsFromNumberPresent`
+  - `whatsappConfigured`
+- Admin-only test endpoint:
+  - `POST /api/admin/notifications/whatsapp-test`
+  - body: `{ "to": "+4479...", "message": "..." }`
 
 Driver photo upload troubleshooting:
 1. Confirm Amplify env var: `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos`

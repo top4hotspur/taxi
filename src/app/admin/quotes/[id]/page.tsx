@@ -30,8 +30,14 @@ type Quote = {
   driverJobSentAt?: string;
   customerDriverEmailSentAt?: string;
   customerDriverSmsSentAt?: string;
+  customerWhatsAppSentAt?: string;
+  customerWhatsAppStatus?: "SENT" | "SKIPPED" | "FAILED";
+  customerWhatsAppError?: string;
   driverJobEmailSentAt?: string;
   driverJobSmsSentAt?: string;
+  driverWhatsAppSentAt?: string;
+  driverWhatsAppStatus?: "SENT" | "SKIPPED" | "FAILED";
+  driverWhatsAppError?: string;
   lastCommunicationError?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
@@ -153,9 +159,13 @@ export default function AdminQuoteDetailPage() {
     message: string;
     summary: {
       customerEmail: string;
+      customerWhatsApp: string;
       customerSms: string;
+      customerSmsAttempted: boolean;
       driverEmail: string;
+      driverWhatsApp: string;
       driverSms: string;
+      driverSmsAttempted: boolean;
       detailMessages: string[];
     };
   } | null>(null);
@@ -331,8 +341,10 @@ export default function AdminQuoteDetailPage() {
       setNotifyResult({ message: data.message, summary: data.notificationSummary });
       const hasFailed = ["failed"].some((status) => [
         data.notificationSummary?.customerEmail,
-        data.notificationSummary?.customerSms,
+        data.notificationSummary?.customerWhatsApp,
         data.notificationSummary?.driverEmail,
+        data.notificationSummary?.driverWhatsApp,
+        data.notificationSummary?.customerSms,
         data.notificationSummary?.driverSms,
       ].includes(status));
       setBanner({
@@ -453,8 +465,14 @@ export default function AdminQuoteDetailPage() {
           {quote.driverDetailsSentAt ? fieldRow("Customer details sent", formatUkDateTime(quote.driverDetailsSentAt)) : null}
           {quote.driverJobSentAt ? fieldRow("Driver job sent", formatUkDateTime(quote.driverJobSentAt)) : null}
           {quote.customerDriverEmailSentAt ? fieldRow("Customer email sent", formatUkDateTime(quote.customerDriverEmailSentAt)) : null}
+          {quote.customerWhatsAppSentAt ? fieldRow("Customer WhatsApp sent", formatUkDateTime(quote.customerWhatsAppSentAt)) : null}
+          {quote.customerWhatsAppStatus ? fieldRow("Customer WhatsApp status", quote.customerWhatsAppStatus) : null}
+          {quote.customerWhatsAppError ? fieldRow("Customer WhatsApp error", quote.customerWhatsAppError) : null}
           {quote.customerDriverSmsSentAt ? fieldRow("Customer SMS sent", formatUkDateTime(quote.customerDriverSmsSentAt)) : null}
           {quote.driverJobEmailSentAt ? fieldRow("Driver email sent", formatUkDateTime(quote.driverJobEmailSentAt)) : null}
+          {quote.driverWhatsAppSentAt ? fieldRow("Driver WhatsApp sent", formatUkDateTime(quote.driverWhatsAppSentAt)) : null}
+          {quote.driverWhatsAppStatus ? fieldRow("Driver WhatsApp status", quote.driverWhatsAppStatus) : null}
+          {quote.driverWhatsAppError ? fieldRow("Driver WhatsApp error", quote.driverWhatsAppError) : null}
           {quote.driverJobSmsSentAt ? fieldRow("Driver SMS sent", formatUkDateTime(quote.driverJobSmsSentAt)) : null}
           {quote.lastCommunicationError ? fieldRow("Last communication error", quote.lastCommunicationError) : null}
 
@@ -512,9 +530,11 @@ export default function AdminQuoteDetailPage() {
           <h3 className="font-semibold text-slate-900">Notification results</h3>
           <div className="mt-2 grid gap-1 sm:grid-cols-2">
             <p>Customer email: {notifyResult.summary.customerEmail}</p>
-            <p>Customer SMS: {notifyResult.summary.customerSms}</p>
+            <p>Customer WhatsApp: {notifyResult.summary.customerWhatsApp}</p>
+            {notifyResult.summary.customerSmsAttempted ? <p>Customer SMS: {notifyResult.summary.customerSms}</p> : null}
             <p>Driver email: {notifyResult.summary.driverEmail}</p>
-            <p>Driver SMS: {notifyResult.summary.driverSms}</p>
+            <p>Driver WhatsApp: {notifyResult.summary.driverWhatsApp}</p>
+            {notifyResult.summary.driverSmsAttempted ? <p>Driver SMS: {notifyResult.summary.driverSms}</p> : null}
           </div>
           {notifyResult.summary.detailMessages.length > 0 ? (
             <ul className="mt-2 list-disc pl-5 text-xs text-slate-600">

@@ -3,6 +3,7 @@ import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { createServerDynamoClient } from "@/lib/db";
 import { checkDriverPhotoBucketAccess, resolveDriverPhotosBucketConfig } from "@/lib/storage/driverPhotos";
+import { getTwilioNotificationHealth } from "@/lib/notifications/twilio";
 
 const dbEnvVars = [
   "DDB_TABLE_USERS",
@@ -67,10 +68,7 @@ export async function GET() {
     (squareEnvironment === "production" && productionAppId);
   const squareServerConfigured = squareModeValid && squareAccessTokenPresent && squareLocationIdPresent;
   const squareClientConfigured = squareApplicationIdPresent && squareClientLocationIdPresent && squareModeAppIdMatch;
-  const twilioAccountSidPresent = Boolean(process.env.TWILIO_ACCOUNT_SID?.trim());
-  const twilioAuthTokenPresent = Boolean(process.env.TWILIO_AUTH_TOKEN?.trim());
-  const twilioFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
-  const smsConfigured = twilioAccountSidPresent && twilioAuthTokenPresent && twilioFromNumberPresent;
+  const twilioHealth = getTwilioNotificationHealth();
   const driverPhotosBucketResolution = resolveDriverPhotosBucketConfig();
   const driverPhotosBucketPresent = Boolean(driverPhotosBucketResolution.bucket);
   const driverPhotosBucketName = driverPhotosBucketResolution.bucket;
@@ -125,10 +123,14 @@ export async function GET() {
     squareServerConfigured,
     squareClientConfigured,
     squareModeAppIdMatch,
-    smsConfigured,
-    twilioAccountSidPresent,
-    twilioAuthTokenPresent,
-    twilioFromNumberPresent,
+    smsConfigured: twilioHealth.twilioAccountSidPresent && twilioHealth.twilioAuthTokenPresent && twilioHealth.smsFromNumberPresent,
+    twilioAccountSidPresent: twilioHealth.twilioAccountSidPresent,
+    twilioAuthTokenPresent: twilioHealth.twilioAuthTokenPresent,
+    twilioFromNumberPresent: twilioHealth.smsFromNumberPresent,
+    smsFromNumberPresent: twilioHealth.smsFromNumberPresent,
+    whatsappFromPresent: twilioHealth.whatsappFromPresent,
+    whatsappNotificationsEnabled: twilioHealth.whatsappNotificationsEnabled,
+    whatsappConfigured: twilioHealth.whatsappConfigured,
     driverPhotosBucketPresent,
     driverPhotosBucketName,
     driverPhotosBucketSource: driverPhotosBucketResolution.source,
