@@ -147,6 +147,10 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   let driverJobEmailProviderMessageId: string | undefined;
   let customerDriverEmailErrorCode: string | undefined;
   let driverJobEmailErrorCode: string | undefined;
+  let customerDriverEmailErrorMessage: string | undefined;
+  let driverJobEmailErrorMessage: string | undefined;
+  let customerDriverEmailProviderStatus: string | undefined;
+  let driverJobEmailProviderStatus: string | undefined;
   let customerWhatsAppMessageSid: string | undefined;
   let driverWhatsAppMessageSid: string | undefined;
   let customerWhatsAppTwilioStatus: string | undefined;
@@ -161,6 +165,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       const emailPayload = customerDriverDetailsEmail(quote, quote.guestName || quote.passengerName);
       const result = await sendEmail({ to: customerEmailTo, subject: emailPayload.subject, text: emailPayload.text });
       customerDriverEmailProviderMessageId = result.providerMessageId || undefined;
+      customerDriverEmailProviderStatus = result.providerStatus || undefined;
       if (result.ok) {
         summary.customerEmail = "sent";
         customerDriverEmailStatus = "SENT";
@@ -170,18 +175,21 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
         summary.customerEmail = result.skipped ? "skipped" : "failed";
         customerDriverEmailStatus = result.skipped ? "SKIPPED" : "FAILED";
         customerDriverEmailErrorCode = result.errorCode || undefined;
+        customerDriverEmailErrorMessage = result.providerErrorMessage || result.error || undefined;
         summary.detailMessages.push(`Customer email ${result.skipped ? "skipped" : "failed"}: ${result.errorCode || result.error || "Unknown error"}`);
       }
     } catch (error) {
       summary.customerEmail = "failed";
       customerDriverEmailStatus = "FAILED";
       customerDriverEmailErrorCode = "EMAIL_SEND_FAILED";
+      customerDriverEmailErrorMessage = error instanceof Error ? error.message : "Unknown error";
       summary.detailMessages.push(`Customer email failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   } else {
     summary.customerEmail = "skipped";
     customerDriverEmailStatus = "SKIPPED";
     customerDriverEmailErrorCode = "EMAIL_RECIPIENT_MISSING";
+    customerDriverEmailErrorMessage = "Recipient email is missing";
     summary.detailMessages.push("Customer email skipped: no customer email available.");
   }
 
@@ -256,6 +264,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     try {
       const emailPayload = driverJobDetailsEmail(quote);
       const result = await sendEmail({ to: driverEmailTo, subject: emailPayload.subject, text: emailPayload.text });
+      driverJobEmailProviderStatus = result.providerStatus || undefined;
       if (result.ok) {
         summary.driverEmail = "sent";
         driverJobEmailStatus = "SENT";
@@ -267,18 +276,21 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
         driverJobEmailStatus = result.skipped ? "SKIPPED" : "FAILED";
         driverJobEmailProviderMessageId = result.providerMessageId || undefined;
         driverJobEmailErrorCode = result.errorCode || undefined;
+        driverJobEmailErrorMessage = result.providerErrorMessage || result.error || undefined;
         summary.detailMessages.push(`Driver email ${result.skipped ? "skipped" : "failed"}: ${result.errorCode || result.error || "Unknown error"}`);
       }
     } catch (error) {
       summary.driverEmail = "failed";
       driverJobEmailStatus = "FAILED";
       driverJobEmailErrorCode = "EMAIL_SEND_FAILED";
+      driverJobEmailErrorMessage = error instanceof Error ? error.message : "Unknown error";
       summary.detailMessages.push(`Driver email failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   } else {
     summary.driverEmail = "skipped";
     driverJobEmailStatus = "SKIPPED";
     driverJobEmailErrorCode = "EMAIL_RECIPIENT_MISSING";
+    driverJobEmailErrorMessage = "Recipient email is missing";
     summary.detailMessages.push("Driver email skipped: no driver email available.");
   }
 
@@ -370,8 +382,13 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     customerDriverEmailProviderMessageId,
     customerDriverEmailRecipient: customerEmailTo || undefined,
     customerDriverEmailSubject: customerDriverDetailsEmail(quote, quote.guestName || quote.passengerName).subject,
-    customerDriverEmailError: summary.customerEmail === "failed" ? summary.detailMessages.find((m) => m.toLowerCase().startsWith("customer email")) : undefined,
+    customerDriverEmailError: customerDriverEmailErrorMessage || (summary.customerEmail === "failed" ? summary.detailMessages.find((m) => m.toLowerCase().startsWith("customer email")) : undefined),
     customerDriverEmailErrorCode,
+    customerEmailStatus: customerDriverEmailStatus,
+    customerEmailErrorCode: customerDriverEmailErrorCode,
+    customerEmailErrorMessage: customerDriverEmailErrorMessage,
+    customerEmailProviderStatus: customerDriverEmailProviderStatus,
+    customerEmailProviderMessageId: customerDriverEmailProviderMessageId,
     customerDriverSmsSentAt: customerDriverSmsSentAt || undefined,
     driverJobEmailSentAt,
     driverJobEmailAttemptedAt: nowIso,
@@ -380,8 +397,13 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     driverJobEmailProviderMessageId,
     driverJobEmailRecipient: driverEmailTo || undefined,
     driverJobEmailSubject: driverJobDetailsEmail(quote).subject,
-    driverJobEmailError: summary.driverEmail === "failed" ? summary.detailMessages.find((m) => m.toLowerCase().startsWith("driver email")) : undefined,
+    driverJobEmailError: driverJobEmailErrorMessage || (summary.driverEmail === "failed" ? summary.detailMessages.find((m) => m.toLowerCase().startsWith("driver email")) : undefined),
     driverJobEmailErrorCode,
+    driverEmailStatus: driverJobEmailStatus,
+    driverEmailErrorCode: driverJobEmailErrorCode,
+    driverEmailErrorMessage: driverJobEmailErrorMessage,
+    driverEmailProviderStatus: driverJobEmailProviderStatus,
+    driverEmailProviderMessageId: driverJobEmailProviderMessageId,
     driverJobSmsSentAt: driverJobSmsSentAt || undefined,
     customerWhatsAppSentAt: customerWhatsAppSentAt || undefined,
     customerWhatsAppAttemptedAt: nowIso,

@@ -133,6 +133,11 @@ export interface QuoteRecord {
   customerDriverEmailSubject?: string;
   customerDriverEmailError?: string;
   customerDriverEmailErrorCode?: string;
+  customerEmailStatus?: "SENT" | "SKIPPED" | "FAILED";
+  customerEmailErrorCode?: string;
+  customerEmailErrorMessage?: string;
+  customerEmailProviderStatus?: string;
+  customerEmailProviderMessageId?: string;
   customerDriverSmsSentAt?: string;
   customerWhatsAppSentAt?: string;
   customerWhatsAppAttemptedAt?: string;
@@ -154,6 +159,11 @@ export interface QuoteRecord {
   driverJobEmailSubject?: string;
   driverJobEmailError?: string;
   driverJobEmailErrorCode?: string;
+  driverEmailStatus?: "SENT" | "SKIPPED" | "FAILED";
+  driverEmailErrorCode?: string;
+  driverEmailErrorMessage?: string;
+  driverEmailProviderStatus?: string;
+  driverEmailProviderMessageId?: string;
   driverJobSmsSentAt?: string;
   driverWhatsAppSentAt?: string;
   driverWhatsAppAttemptedAt?: string;

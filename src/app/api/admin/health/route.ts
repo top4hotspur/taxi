@@ -54,7 +54,7 @@ export async function GET() {
   const emailConfigured = Boolean(emailProvider && resendApiKeyPresent && emailFromPresent && adminEmailPresent);
   const emailGuidance =
     emailProvider === "resend"
-      ? "Check Resend domain/sender verification and spam folder."
+      ? "Check Resend dashboard logs and domain/sender verification if email sends fail."
       : "Email provider not configured.";
   const squareEnvironment = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() || "missing";
   const squareAccessTokenPresent = Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim());

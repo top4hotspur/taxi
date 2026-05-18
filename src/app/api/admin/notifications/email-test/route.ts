@@ -42,6 +42,12 @@ export async function POST(request: Request) {
       status: "sent",
       provider: "RESEND",
       providerMessageId: result.providerMessageId || null,
+      providerStatusCode: result.providerStatusCode ?? null,
+      from: result.from || null,
+      to: result.to || to,
+      subject: result.subject || subject,
+      apiKeyPresent: Boolean(result.apiKeyPresent),
+      emailFromPresent: Boolean(result.emailFromPresent),
       safeMessage: "Email accepted by provider.",
     });
   }
@@ -53,9 +59,15 @@ export async function POST(request: Request) {
       provider: "RESEND",
       providerMessageId: result.providerMessageId || null,
       errorCode: result.errorCode || "EMAIL_SEND_FAILED",
+      providerErrorMessage: result.providerErrorMessage || result.error || "Email send failed.",
+      providerStatusCode: result.providerStatusCode ?? null,
+      from: result.from || null,
+      to: result.to || to,
+      subject: result.subject || subject,
+      apiKeyPresent: Boolean(result.apiKeyPresent),
+      emailFromPresent: Boolean(result.emailFromPresent),
       safeMessage: result.error || "Email send failed.",
     },
     { status: result.skipped ? 400 : 502 }
   );
 }
-
