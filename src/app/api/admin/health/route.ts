@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { createServerDynamoClient } from "@/lib/db";
-import { checkDriverPhotoBucketAccess } from "@/lib/storage/driverPhotos";
+import { checkDriverPhotoBucketAccess, resolveDriverPhotosBucketConfig } from "@/lib/storage/driverPhotos";
 
 const dbEnvVars = [
   "DDB_TABLE_USERS",
@@ -71,8 +71,9 @@ export async function GET() {
   const twilioAuthTokenPresent = Boolean(process.env.TWILIO_AUTH_TOKEN?.trim());
   const twilioFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
   const smsConfigured = twilioAccountSidPresent && twilioAuthTokenPresent && twilioFromNumberPresent;
-  const driverPhotosBucketPresent = Boolean(process.env.DRIVER_PHOTOS_BUCKET?.trim());
-  const driverPhotosBucketName = process.env.DRIVER_PHOTOS_BUCKET?.trim() || null;
+  const driverPhotosBucketResolution = resolveDriverPhotosBucketConfig();
+  const driverPhotosBucketPresent = Boolean(driverPhotosBucketResolution.bucket);
+  const driverPhotosBucketName = driverPhotosBucketResolution.bucket;
   const driverTableNamePresent = Boolean(process.env.DDB_TABLE_DRIVER_PROFILES?.trim());
   const driverTableConfigured = ddbTableChecks.some(
     (check) => check.envVar === "DDB_TABLE_DRIVER_PROFILES" && check.configured && check.exists
@@ -130,6 +131,9 @@ export async function GET() {
     twilioFromNumberPresent,
     driverPhotosBucketPresent,
     driverPhotosBucketName,
+    driverPhotosBucketSource: driverPhotosBucketResolution.source,
+    driverPhotosBucketEnvPresent: driverPhotosBucketResolution.driverPhotosBucketPresent,
+    appDriverPhotosBucketEnvPresent: driverPhotosBucketResolution.appDriverPhotosBucketPresent,
     driverTableConfigured,
     driverTableNamePresent,
     driverPhotosBucketConfigured: driverPhotosBucketPresent,

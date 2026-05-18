@@ -20,10 +20,44 @@ function createS3Client() {
   });
 }
 
+type DriverPhotosBucketConfig = {
+  bucket: string | null;
+  source: "DRIVER_PHOTOS_BUCKET" | "APP_DRIVER_PHOTOS_BUCKET" | "UNCONFIGURED";
+  driverPhotosBucketPresent: boolean;
+  appDriverPhotosBucketPresent: boolean;
+};
+
+export function resolveDriverPhotosBucketConfig(): DriverPhotosBucketConfig {
+  const fromDriverPhotosBucket = process.env.DRIVER_PHOTOS_BUCKET?.trim() || "";
+  const fromAppDriverPhotosBucket = process.env.APP_DRIVER_PHOTOS_BUCKET?.trim() || "";
+  if (fromDriverPhotosBucket) {
+    return {
+      bucket: fromDriverPhotosBucket,
+      source: "DRIVER_PHOTOS_BUCKET",
+      driverPhotosBucketPresent: true,
+      appDriverPhotosBucketPresent: Boolean(fromAppDriverPhotosBucket),
+    };
+  }
+  if (fromAppDriverPhotosBucket) {
+    return {
+      bucket: fromAppDriverPhotosBucket,
+      source: "APP_DRIVER_PHOTOS_BUCKET",
+      driverPhotosBucketPresent: false,
+      appDriverPhotosBucketPresent: true,
+    };
+  }
+  return {
+    bucket: null,
+    source: "UNCONFIGURED",
+    driverPhotosBucketPresent: false,
+    appDriverPhotosBucketPresent: false,
+  };
+}
+
 export function getDriverPhotosBucket() {
-  const bucket = process.env.DRIVER_PHOTOS_BUCKET?.trim();
-  if (!bucket) throw new Error("DRIVER_PHOTOS_BUCKET_NOT_CONFIGURED");
-  return bucket;
+  const resolved = resolveDriverPhotosBucketConfig();
+  if (!resolved.bucket) throw new Error("DRIVER_PHOTOS_BUCKET_NOT_CONFIGURED");
+  return resolved.bucket;
 }
 
 export async function getDriverPhotoSignedUrl(photoKey: string, expiresInSeconds = 3600) {
