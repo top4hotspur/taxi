@@ -508,7 +508,9 @@ export default function AdminQuoteDetailPage() {
           {fieldRow("Customer WhatsApp", quote.customerWhatsAppStatus || "Not attempted")}
           {quote.customerWhatsAppRecipient ? fieldRow("Customer WhatsApp recipient", quote.customerWhatsAppRecipient) : null}
           {quote.customerWhatsAppMessageSid ? fieldRow("Customer WhatsApp SID", quote.customerWhatsAppMessageSid) : null}
+          {quote.customerWhatsAppMessageSid ? <p className="text-xs text-slate-500">Copy SID: <code className="select-all">{quote.customerWhatsAppMessageSid}</code></p> : null}
           {quote.customerWhatsAppTwilioStatus ? fieldRow("Customer WhatsApp Twilio status", quote.customerWhatsAppTwilioStatus) : null}
+          {quote.customerWhatsAppStatus === "QUEUED" ? <p className="text-xs text-slate-600">Queued by Twilio — check Twilio logs for final delivery status.</p> : null}
           {quote.customerWhatsAppTemplateSid ? fieldRow("Customer WhatsApp template", quote.customerWhatsAppTemplateSid) : null}
           {quote.customerWhatsAppTwilioErrorCode || quote.customerWhatsAppError ? fieldRow("Customer WhatsApp error", `${quote.customerWhatsAppTwilioErrorCode || ""} ${quote.customerWhatsAppError || ""}`.trim()) : null}
           {fieldRow("Driver email", quote.driverEmailStatus || quote.driverJobEmailStatus || "Not attempted")}
@@ -519,7 +521,9 @@ export default function AdminQuoteDetailPage() {
           {fieldRow("Driver WhatsApp", quote.driverWhatsAppStatus || "Not attempted")}
           {quote.driverWhatsAppRecipient ? fieldRow("Driver WhatsApp recipient", quote.driverWhatsAppRecipient) : null}
           {quote.driverWhatsAppMessageSid ? fieldRow("Driver WhatsApp SID", quote.driverWhatsAppMessageSid) : null}
+          {quote.driverWhatsAppMessageSid ? <p className="text-xs text-slate-500">Copy SID: <code className="select-all">{quote.driverWhatsAppMessageSid}</code></p> : null}
           {quote.driverWhatsAppTwilioStatus ? fieldRow("Driver WhatsApp Twilio status", quote.driverWhatsAppTwilioStatus) : null}
+          {quote.driverWhatsAppStatus === "QUEUED" ? <p className="text-xs text-slate-600">Queued by Twilio — check Twilio logs for final delivery status.</p> : null}
           {quote.driverWhatsAppTemplateSid ? fieldRow("Driver WhatsApp template", quote.driverWhatsAppTemplateSid) : null}
           {quote.driverWhatsAppTwilioErrorCode || quote.driverWhatsAppError ? fieldRow("Driver WhatsApp error", `${quote.driverWhatsAppTwilioErrorCode || ""} ${quote.driverWhatsAppError || ""}`.trim()) : null}
           <p className="text-xs text-slate-500">Email is the required channel. WhatsApp is optional until templates are approved and delivery is confirmed.</p>

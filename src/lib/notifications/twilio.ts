@@ -195,6 +195,7 @@ export async function sendSms(input: SendPhoneMessageInput): Promise<TwilioChann
 }
 
 export function getTwilioNotificationHealth() {
+  // TODO: Add Twilio status-callback webhook to transition WhatsApp states from QUEUED to DELIVERED/FAILED.
   const twilioAccountSidPresent = Boolean(process.env.TWILIO_ACCOUNT_SID?.trim());
   const twilioAuthTokenPresent = Boolean(process.env.TWILIO_AUTH_TOKEN?.trim());
   const whatsappFromPresent = Boolean(process.env.TWILIO_WHATSAPP_FROM?.trim());

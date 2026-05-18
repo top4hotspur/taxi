@@ -44,10 +44,12 @@ type Quote = {
   assignedDriverPhone?: string;
   assignedDriverPhotoUrl?: string;
   assignedVehicleMake?: string;
+  assignedVehicleModel?: string;
   assignedVehicleColour?: string;
   assignedVehicleRegistration?: string;
   assignmentStatus?: "NOT_ASSIGNED" | "ASSIGNED" | "DETAILS_SENT" | "PARTIALLY_SENT" | "FAILED_TO_SEND";
   driverDetailsSentAt?: string;
+  customerWhatsAppStatus?: "SENT" | "QUEUED" | "DELIVERED" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED";
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
   squarePaymentId?: string;
@@ -167,12 +169,23 @@ export default function AccountQuoteDetail() {
           <p className="text-lg font-semibold">Payment received</p>
           <p>Paid amount: {formatMoney(quote.paymentAmount ?? model.confirmedAmount, quote.paymentCurrency || model.confirmedCurrency)}</p>
           <p>Paid at: {formatUkDateTime(quote.paidAt)}</p>
-          {!quote.assignedDriverId ? <p>We&apos;ll send your driver details once assigned.</p> : null}
-          {(quote.assignmentStatus === "DETAILS_SENT" || quote.driverDetailsSentAt) && quote.assignedDriverId ? <p>Driver details sent.</p> : null}
+          {!quote.assignedDriverId ? (
+            <p>Your booking request is now paid and awaiting final driver confirmation.</p>
+          ) : (
+            <p>Your booking is paid and your driver details are shown below.</p>
+          )}
         </article>
       ) : null}
 
-      {model.isPaid && quote.assignedDriverId && (quote.assignmentStatus === "DETAILS_SENT" || quote.driverDetailsSentAt) ? (
+      {model.isPaid && !quote.assignedDriverId ? (
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 text-sm space-y-2">
+          <p className="text-lg font-semibold">Your driver is being assigned</p>
+          <p>Thanks — your payment has been received. We&apos;re now assigning a driver to your booking. This page will update with your driver and vehicle details once confirmed.</p>
+          <p>We&apos;ll also send your driver details by email, and by WhatsApp where available.</p>
+        </article>
+      ) : null}
+
+      {model.isPaid && quote.assignedDriverId ? (
         <article className="rounded-2xl border border-slate-200 bg-white p-5 text-sm space-y-3">
           <p className="text-lg font-semibold">Your driver details</p>
           <div className="flex items-start gap-4">
@@ -187,11 +200,14 @@ export default function AccountQuoteDetail() {
             <div className="space-y-1">
               <p><strong>Driver:</strong> {quote.assignedDriverName || "Not provided"}</p>
               <p><strong>Telephone:</strong> {quote.assignedDriverPhone || "Not provided"}</p>
-              <p><strong>Car:</strong> {quote.assignedVehicleMake || "Not provided"}</p>
+              <p><strong>Vehicle:</strong> {[quote.assignedVehicleColour, quote.assignedVehicleMake, quote.assignedVehicleModel].filter(Boolean).join(" ") || "Not provided"}</p>
               <p><strong>Registration:</strong> {quote.assignedVehicleRegistration || "Not provided"}</p>
             </div>
           </div>
-          <p>Please keep these details available for your journey.</p>
+          <p>Your driver has been assigned. Please keep these details available for your journey.</p>
+          <p>We&apos;ve emailed these details to you. If WhatsApp delivery is available, you may also receive them by WhatsApp.</p>
+          {quote.customerWhatsAppStatus === "QUEUED" ? <p className="text-xs text-slate-600">WhatsApp message queued by our provider.</p> : null}
+          {(quote.customerWhatsAppStatus === "SENT" || quote.customerWhatsAppStatus === "DELIVERED") ? <p className="text-xs text-slate-600">WhatsApp message sent.</p> : null}
         </article>
       ) : null}
 
