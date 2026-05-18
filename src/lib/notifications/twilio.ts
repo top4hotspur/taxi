@@ -127,9 +127,6 @@ export async function sendWhatsApp(input: SendPhoneMessageInput): Promise<Twilio
   if (!normalized) {
     return { ok: false, skipped: true, reason: "WHATSAPP_RECIPIENT_INVALID" };
   }
-  if (!input.body && !input.contentSid) {
-    return { ok: false, skipped: true, reason: "WHATSAPP_INPUT_INVALID" };
-  }
   if (!whatsappEnabled()) {
     return { ok: false, skipped: true, reason: "WHATSAPP_DISABLED" };
   }
@@ -138,6 +135,9 @@ export async function sendWhatsApp(input: SendPhoneMessageInput): Promise<Twilio
   }
   if (!input.contentSid) {
     return { ok: false, skipped: true, reason: "WHATSAPP_TEMPLATE_NOT_CONFIGURED" };
+  }
+  if (!input.body && (!input.contentVariables || Object.keys(input.contentVariables).length === 0)) {
+    return { ok: false, skipped: true, reason: "WHATSAPP_INPUT_INVALID" };
   }
 
   const from = process.env.TWILIO_WHATSAPP_FROM!.trim();

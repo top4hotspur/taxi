@@ -69,6 +69,11 @@ export async function GET() {
   const squareServerConfigured = squareModeValid && squareAccessTokenPresent && squareLocationIdPresent;
   const squareClientConfigured = squareApplicationIdPresent && squareClientLocationIdPresent && squareModeAppIdMatch;
   const twilioHealth = getTwilioNotificationHealth();
+  const whatsappTemplateGuidance =
+    twilioHealth.whatsappNotificationsEnabled &&
+    (!twilioHealth.customerWhatsAppTemplatePresent || !twilioHealth.driverWhatsAppTemplatePresent)
+      ? "WhatsApp is enabled but template SID env vars are missing. Add TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID and TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID, then redeploy."
+      : null;
   const driverPhotosBucketResolution = resolveDriverPhotosBucketConfig();
   const driverPhotosBucketPresent = Boolean(driverPhotosBucketResolution.bucket);
   const driverPhotosBucketName = driverPhotosBucketResolution.bucket;
@@ -135,6 +140,7 @@ export async function GET() {
     customerWhatsAppTemplateSidPresent: twilioHealth.customerWhatsAppTemplatePresent,
     driverWhatsAppTemplateSidPresent: twilioHealth.driverWhatsAppTemplatePresent,
     whatsappConfigured: twilioHealth.whatsappConfigured,
+    whatsappTemplateGuidance,
     driverPhotosBucketPresent,
     driverPhotosBucketName,
     driverPhotosBucketSource: driverPhotosBucketResolution.source,
