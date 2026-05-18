@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db, DbConfigMissingError } from "@/lib/db";
+import { resolveDriverPhotoUrl } from "@/lib/storage/driverPhotos";
 
-function toDriver(profile: Awaited<ReturnType<typeof db.getDriverProfileById>> | null) {
+async function toDriver(profile: Awaited<ReturnType<typeof db.getDriverProfileById>> | null) {
   if (!profile) return null;
   return {
     id: profile.id,
     name: profile.name,
     email: profile.email,
     phone: profile.mobile,
-    photoUrl: profile.photoUrl || profile.profilePhoto || null,
+    photoUrl: await resolveDriverPhotoUrl({ photoKey: profile.photoKey, photoUrl: profile.photoUrl || profile.profilePhoto || null }),
     photoKey: profile.photoKey || null,
     carMake: profile.carMake || "",
     carModel: profile.carModel || "",
@@ -31,7 +32,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!profile) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
 
   const documents = await db.listDriverDocumentsByUserId(profile.userId);
-  return NextResponse.json({ success: true, driver: toDriver(profile), documents });
+  return NextResponse.json({ success: true, driver: await toDriver(profile), documents });
 }
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -94,7 +95,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       status: isActive ? "ACTIVE" : "SUSPENDED",
     });
 
-    return NextResponse.json({ success: true, driver: toDriver(updated) });
+    return NextResponse.json({ success: true, driver: await toDriver(updated) });
   } catch (error) {
     if (error instanceof DbConfigMissingError && error.missingEnvVars.includes("DDB_TABLE_DRIVER_PROFILES")) {
       return NextResponse.json(

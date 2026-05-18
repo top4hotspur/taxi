@@ -3,6 +3,7 @@ import { normalizeQuoteStatus, type QuoteStatusValue } from "@/lib/quote/constan
 import { db } from "@/lib/db";
 import { getCurrentSessionUser } from "@/lib/auth/guards";
 import { sendStatusLifecycleEmails, updateQuoteStatusAudit } from "@/lib/quote/service";
+import { resolveDriverPhotoUrl } from "@/lib/storage/driverPhotos";
 
 function toCustomerQuoteView<T extends { adminNotes?: string } | null | undefined>(quote: T) {
   if (!quote) return quote;
@@ -20,7 +21,19 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     (q) => q.id === id && (q.customerId === user.userId || (q.guestEmail || "").trim().toLowerCase() === normalizedEmail)
   );
   if (!quote) return NextResponse.json({ success: false, message: "Not found" }, { status: 404 });
-  return NextResponse.json({ success: true, quote: { ...toCustomerQuoteView(quote), booking: await db.getBookingForQuote(id), audits: await db.getAuditsByQuote(id) } });
+  const signedDriverPhotoUrl = await resolveDriverPhotoUrl({
+    photoKey: quote.assignedDriverPhotoKey,
+    photoUrl: quote.assignedDriverPhotoUrl,
+  });
+  return NextResponse.json({
+    success: true,
+    quote: {
+      ...toCustomerQuoteView(quote),
+      assignedDriverPhotoUrl: signedDriverPhotoUrl || quote.assignedDriverPhotoUrl,
+      booking: await db.getBookingForQuote(id),
+      audits: await db.getAuditsByQuote(id),
+    },
+  });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {

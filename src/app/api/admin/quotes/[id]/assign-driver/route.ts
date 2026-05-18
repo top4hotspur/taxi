@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
+import { resolveDriverPhotoUrl } from "@/lib/storage/driverPhotos";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentSessionUser();
@@ -27,12 +28,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   const assignedAt = new Date().toISOString();
+  const assignedDriverPhotoUrl = await resolveDriverPhotoUrl({
+    photoKey: driver.photoKey,
+    photoUrl: driver.photoUrl || driver.profilePhoto || undefined,
+  });
   const updated = await db.updateQuote(id, {
     assignedDriverId: driver.id,
     assignedDriverName: driver.name,
     assignedDriverPhone: driver.mobile,
     assignedDriverEmail: driver.email,
-    assignedDriverPhotoUrl: driver.photoUrl || driver.profilePhoto || undefined,
+    assignedDriverPhotoKey: driver.photoKey || undefined,
+    assignedDriverPhotoUrl: assignedDriverPhotoUrl || undefined,
     assignedVehicleMake: [driver.carColour, driver.carMake, driver.carModel].filter(Boolean).join(" "),
     assignedVehicleColour: driver.carColour || undefined,
     assignedVehicleRegistration: driver.registrationNumber,

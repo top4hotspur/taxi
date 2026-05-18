@@ -133,6 +133,11 @@ Temporary implementation:
 3. Add `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos` in Amplify env vars.
 4. Ensure server runtime IAM permissions include `s3:PutObject` and `s3:GetObject` for this bucket.
 5. Redeploy after adding env vars.
+6. Driver photos are stored privately in S3 and rendered using short-lived signed URLs from server APIs.
+
+Diagnostics:
+- Admin health: `GET /api/admin/health` includes `driverPhotosBucketName`, `driverPhotoUploadConfigured`, and `driverPhotoStorageCheck`.
+- Storage test endpoint: `GET /api/admin/health/driver-photo-storage-test` (admin only, temporary) verifies Put/Delete access with a diagnostic test object.
 
 ### 6) Google Maps Places Autocomplete setup
 1. Create a Google Cloud project.

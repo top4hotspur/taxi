@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { createServerDynamoClient } from "@/lib/db";
+import { checkDriverPhotoBucketAccess } from "@/lib/storage/driverPhotos";
 
 const dbEnvVars = [
   "DDB_TABLE_USERS",
@@ -71,11 +72,22 @@ export async function GET() {
   const twilioFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
   const smsConfigured = twilioAccountSidPresent && twilioAuthTokenPresent && twilioFromNumberPresent;
   const driverPhotosBucketPresent = Boolean(process.env.DRIVER_PHOTOS_BUCKET?.trim());
+  const driverPhotosBucketName = process.env.DRIVER_PHOTOS_BUCKET?.trim() || null;
   const driverTableNamePresent = Boolean(process.env.DDB_TABLE_DRIVER_PROFILES?.trim());
   const driverTableConfigured = ddbTableChecks.some(
     (check) => check.envVar === "DDB_TABLE_DRIVER_PROFILES" && check.configured && check.exists
   );
   const driverPhotoUploadConfigured = driverPhotosBucketPresent;
+  const driverPhotoStorageCheck = driverPhotosBucketPresent
+    ? await checkDriverPhotoBucketAccess()
+    : {
+        ok: false,
+        stage: "NOT_CONFIGURED",
+        bucket: null,
+        s3ErrorCode: "DRIVER_PHOTOS_BUCKET_NOT_CONFIGURED",
+        s3ErrorMessage: "Driver photos bucket is not configured.",
+        s3StatusCode: null,
+      };
 
   return NextResponse.json({
     ok: true,
@@ -117,9 +129,11 @@ export async function GET() {
     twilioAuthTokenPresent,
     twilioFromNumberPresent,
     driverPhotosBucketPresent,
+    driverPhotosBucketName,
     driverTableConfigured,
     driverTableNamePresent,
     driverPhotosBucketConfigured: driverPhotosBucketPresent,
     driverPhotoUploadConfigured,
+    driverPhotoStorageCheck,
   });
 }

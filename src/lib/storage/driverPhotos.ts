@@ -1,4 +1,5 @@
-﻿import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "node:crypto";
 
 const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "eu-west-2";
@@ -25,8 +26,81 @@ export function getDriverPhotosBucket() {
   return bucket;
 }
 
-export function buildDriverPhotoPublicUrl(bucket: string, key: string) {
-  return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+export async function getDriverPhotoSignedUrl(photoKey: string, expiresInSeconds = 3600) {
+  const key = photoKey.trim();
+  if (!key) return null;
+  const bucket = getDriverPhotosBucket();
+  const client = createS3Client();
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: key,
+    }),
+    { expiresIn: expiresInSeconds }
+  );
+}
+
+export async function resolveDriverPhotoUrl(params: { photoKey?: string | null; photoUrl?: string | null }) {
+  const photoKey = params.photoKey?.trim();
+  if (photoKey) {
+    try {
+      const signed = await getDriverPhotoSignedUrl(photoKey);
+      if (signed) return signed;
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          level: "warn",
+          source: "driverPhotos.resolveDriverPhotoUrl",
+          message: error instanceof Error ? error.message : "Failed to sign driver photo URL",
+        })
+      );
+    }
+  }
+  return params.photoUrl?.trim() || null;
+}
+
+export async function checkDriverPhotoBucketAccess() {
+  const bucket = getDriverPhotosBucket();
+  const client = createS3Client();
+
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
+  } catch (error) {
+    const awsError = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    return {
+      ok: false,
+      stage: "HEAD_BUCKET",
+      bucket,
+      s3ErrorCode: awsError?.name || null,
+      s3ErrorMessage: awsError?.message || null,
+      s3StatusCode: awsError?.$metadata?.httpStatusCode ?? null,
+    } as const;
+  }
+
+  const fakeKey = `drivers/health-check-${crypto.randomUUID()}.jpg`;
+  try {
+    await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: fakeKey }), { expiresIn: 300 });
+  } catch (error) {
+    const awsError = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    return {
+      ok: false,
+      stage: "SIGN_GET_OBJECT",
+      bucket,
+      s3ErrorCode: awsError?.name || null,
+      s3ErrorMessage: awsError?.message || null,
+      s3StatusCode: awsError?.$metadata?.httpStatusCode ?? null,
+    } as const;
+  }
+
+  return {
+    ok: true,
+    stage: "OK",
+    bucket,
+    s3ErrorCode: null,
+    s3ErrorMessage: null,
+    s3StatusCode: null,
+  } as const;
 }
 
 export async function uploadDriverPhoto(params: {
@@ -45,8 +119,9 @@ export async function uploadDriverPhoto(params: {
       ContentType: params.contentType,
     })
   );
+
   return {
     photoKey: key,
-    photoUrl: buildDriverPhotoPublicUrl(bucket, key),
+    photoUrl: await getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: 3600 }),
   };
 }

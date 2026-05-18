@@ -1,7 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db, DbConfigMissingError } from "@/lib/db";
 import { DRIVER_DOCUMENT_TYPES } from "@/lib/driver/constants";
+import { resolveDriverPhotoUrl } from "@/lib/storage/driverPhotos";
 
 function computeFlags(documents: { type: string; status: string; expiryDate?: string | null }[]) {
   const now = new Date().toISOString().slice(0, 10);
@@ -10,13 +11,13 @@ function computeFlags(documents: { type: string; status: string; expiryDate?: st
   return { missingDocuments: missing, expiredDocuments: expired };
 }
 
-function toDriverListItem(profile: Awaited<ReturnType<typeof db.listDriverProfiles>>[number]) {
+async function toDriverListItem(profile: Awaited<ReturnType<typeof db.listDriverProfiles>>[number]) {
   return {
     id: profile.id,
     name: profile.name,
     email: profile.email,
     phone: profile.mobile,
-    photoUrl: profile.photoUrl || profile.profilePhoto || null,
+    photoUrl: await resolveDriverPhotoUrl({ photoKey: profile.photoKey, photoUrl: profile.photoUrl || profile.profilePhoto || null }),
     photoKey: profile.photoKey || null,
     carMake: profile.carMake || "",
     carModel: profile.carModel || "",
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
     filtered.map(async (profile) => {
       const documents = await db.listDriverDocumentsByUserId(profile.userId);
       return {
-        ...toDriverListItem(profile),
+        ...(await toDriverListItem(profile)),
         ...computeFlags(documents),
       };
     }),
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
       isActive: body.isActive !== false,
     });
 
-    return NextResponse.json({ success: true, driver: toDriverListItem(created) });
+    return NextResponse.json({ success: true, driver: await toDriverListItem(created) });
   } catch (error) {
     if (error instanceof DbConfigMissingError) {
       const driverTableMissing = error.missingEnvVars.includes("DDB_TABLE_DRIVER_PROFILES");

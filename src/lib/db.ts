@@ -115,6 +115,7 @@ export interface QuoteRecord {
   assignedDriverName?: string;
   assignedDriverPhone?: string;
   assignedDriverEmail?: string;
+  assignedDriverPhotoKey?: string;
   assignedDriverPhotoUrl?: string;
   assignedVehicleMake?: string;
   assignedVehicleColour?: string;
