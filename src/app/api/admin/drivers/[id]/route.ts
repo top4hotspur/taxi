@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
-import { db } from "@/lib/db";
+import { db, DbConfigMissingError } from "@/lib/db";
 
 function toDriver(profile: Awaited<ReturnType<typeof db.getDriverProfileById>> | null) {
   if (!profile) return null;
@@ -10,6 +10,7 @@ function toDriver(profile: Awaited<ReturnType<typeof db.getDriverProfileById>> |
     email: profile.email,
     phone: profile.mobile,
     photoUrl: profile.photoUrl || profile.profilePhoto || null,
+    photoKey: profile.photoKey || null,
     carMake: profile.carMake || "",
     carModel: profile.carModel || "",
     carColour: profile.carColour || "",
@@ -46,6 +47,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     email?: string;
     phone?: string;
     photoUrl?: string;
+    photoKey?: string;
     carMake?: string;
     carModel?: string;
     carColour?: string;
@@ -61,6 +63,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const carColour = String(body.carColour || existing.carColour || "").trim();
   const registrationNumber = String(body.registrationNumber || existing.registrationNumber).trim().toUpperCase();
   const photoUrl = String(body.photoUrl || existing.photoUrl || existing.profilePhoto || "").trim();
+  const photoKey = String(body.photoKey || existing.photoKey || "").trim();
   const isActive = body.isActive !== undefined ? Boolean(body.isActive) : existing.isActive !== false && existing.status === "ACTIVE";
 
   if (!name || !email || !phone || !carMake || !registrationNumber) {
@@ -75,19 +78,46 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ success: false, message: "Another driver already uses this email." }, { status: 409 });
   }
 
-  const updated = await db.updateDriverProfileById(existing.id, {
-    name,
-    email,
-    mobile: phone,
-    photoUrl: photoUrl || null,
-    profilePhoto: photoUrl || null,
-    carMake,
-    carModel,
-    carColour: carColour || null,
-    registrationNumber,
-    isActive,
-    status: isActive ? "ACTIVE" : "SUSPENDED",
-  });
+  try {
+    const updated = await db.updateDriverProfileById(existing.id, {
+      name,
+      email,
+      mobile: phone,
+      photoUrl: photoUrl || null,
+      photoKey: photoKey || null,
+      profilePhoto: photoUrl || null,
+      carMake,
+      carModel,
+      carColour: carColour || null,
+      registrationNumber,
+      isActive,
+      status: isActive ? "ACTIVE" : "SUSPENDED",
+    });
 
-  return NextResponse.json({ success: true, driver: toDriver(updated) });
+    return NextResponse.json({ success: true, driver: toDriver(updated) });
+  } catch (error) {
+    if (error instanceof DbConfigMissingError && error.missingEnvVars.includes("DDB_TABLE_DRIVER_PROFILES")) {
+      return NextResponse.json(
+        { success: false, errorCode: "DRIVER_TABLE_NOT_CONFIGURED", message: "Driver table is not configured." },
+        { status: 503 }
+      );
+    }
+    const awsError = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (awsError?.name === "ResourceNotFoundException") {
+      return NextResponse.json(
+        { success: false, errorCode: "DRIVER_TABLE_UNAVAILABLE", message: "Driver table is unavailable." },
+        { status: 503 }
+      );
+    }
+    if (awsError?.name === "AccessDeniedException" || awsError?.$metadata?.httpStatusCode === 403) {
+      return NextResponse.json(
+        { success: false, errorCode: "DRIVER_SAVE_FORBIDDEN", message: "Driver could not be saved. Please check admin health." },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json(
+      { success: false, errorCode: "DRIVER_SAVE_FAILED", message: "Driver could not be saved. Please check admin health." },
+      { status: 500 }
+    );
+  }
 }

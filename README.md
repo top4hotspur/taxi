@@ -70,7 +70,7 @@ Set these in Amplify Hosting (and locally for real sending):
 - `TWILIO_ACCOUNT_SID` (optional, SMS)
 - `TWILIO_AUTH_TOKEN` (optional, SMS)
 - `TWILIO_FROM_NUMBER` (optional, SMS)
-- `DRIVER_PHOTOS_BUCKET` (optional, for future S3 photo upload path)
+- `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos` (required for admin driver photo upload)
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
 
@@ -126,6 +126,13 @@ First admin user:
 Temporary implementation:
 - Manual admin endpoint: `POST /api/admin/reminders/driver-compliance/run`
 - Future scheduled version: move to daily EventBridge + Amplify scheduled function trigger.
+
+### 5.1) Driver photo upload bucket
+1. Create S3 bucket: `ni-taxi-driver-photos`
+2. Region: `eu-west-2` (or your configured `APP_AWS_REGION`)
+3. Add `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos` in Amplify env vars.
+4. Ensure server runtime IAM permissions include `s3:PutObject` and `s3:GetObject` for this bucket.
+5. Redeploy after adding env vars.
 
 ### 6) Google Maps Places Autocomplete setup
 1. Create a Google Cloud project.

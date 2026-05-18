@@ -168,6 +168,7 @@ export interface DriverProfileRecord {
   email: string;
   mobile: string;
   photoUrl?: string | null;
+  photoKey?: string | null;
   addressLine1: string;
   addressLine2?: string | null;
   city: string;
@@ -779,6 +780,7 @@ export const db = {
       | "email"
       | "mobile"
       | "photoUrl"
+      | "photoKey"
       | "carMake"
       | "carModel"
       | "carColour"
@@ -798,6 +800,7 @@ export const db = {
       email: input.email,
       mobile: input.mobile,
       photoUrl: input.photoUrl ?? null,
+      photoKey: input.photoKey ?? null,
       addressLine1: "",
       addressLine2: null,
       city: "",

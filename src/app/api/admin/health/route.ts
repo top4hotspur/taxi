@@ -71,6 +71,11 @@ export async function GET() {
   const twilioFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
   const smsConfigured = twilioAccountSidPresent && twilioAuthTokenPresent && twilioFromNumberPresent;
   const driverPhotosBucketPresent = Boolean(process.env.DRIVER_PHOTOS_BUCKET?.trim());
+  const driverTableNamePresent = Boolean(process.env.DDB_TABLE_DRIVER_PROFILES?.trim());
+  const driverTableConfigured = ddbTableChecks.some(
+    (check) => check.envVar === "DDB_TABLE_DRIVER_PROFILES" && check.configured && check.exists
+  );
+  const driverPhotoUploadConfigured = driverPhotosBucketPresent;
 
   return NextResponse.json({
     ok: true,
@@ -112,5 +117,9 @@ export async function GET() {
     twilioAuthTokenPresent,
     twilioFromNumberPresent,
     driverPhotosBucketPresent,
+    driverTableConfigured,
+    driverTableNamePresent,
+    driverPhotosBucketConfigured: driverPhotosBucketPresent,
+    driverPhotoUploadConfigured,
   });
 }

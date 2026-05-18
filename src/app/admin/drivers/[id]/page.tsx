@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { formatUkDateTime } from "@/lib/formatting";
+import DriverPhotoUploader from "@/components/DriverPhotoUploader";
 
 type Driver = {
   id: string;
@@ -10,6 +11,7 @@ type Driver = {
   email: string;
   phone: string;
   photoUrl?: string | null;
+  photoKey?: string | null;
   carMake: string;
   carModel?: string;
   carColour?: string;
@@ -26,6 +28,7 @@ export default function AdminDriverDetailPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState("");
+  const [photo, setPhoto] = useState<{ photoKey: string; photoUrl: string } | null>(null);
 
   useEffect(() => {
     if (!params.id) return;
@@ -40,6 +43,9 @@ export default function AdminDriverDetailPage() {
           return;
         }
         setDriver(data.driver);
+        if (data.driver?.photoUrl) {
+          setPhoto({ photoKey: data.driver.photoKey || "", photoUrl: data.driver.photoUrl });
+        }
       } catch {
         if (active) setError("Unable to load driver.");
       }
@@ -61,7 +67,8 @@ export default function AdminDriverDetailPage() {
       name: String(fd.get("name") || "").trim(),
       email: String(fd.get("email") || "").trim(),
       phone: String(fd.get("phone") || "").trim(),
-      photoUrl: String(fd.get("photoUrl") || "").trim(),
+      photoUrl: photo?.photoUrl || "",
+      photoKey: photo?.photoKey || "",
       carMake: String(fd.get("carMake") || "").trim(),
       carModel: String(fd.get("carModel") || "").trim(),
       carColour: String(fd.get("carColour") || "").trim(),
@@ -81,6 +88,7 @@ export default function AdminDriverDetailPage() {
         return;
       }
       setDriver(data.driver);
+      setPhoto(data.driver?.photoUrl ? { photoKey: data.driver.photoKey || "", photoUrl: data.driver.photoUrl } : null);
       setSaved("Driver updated.");
     } catch {
       setError("Unable to update driver.");
@@ -121,7 +129,9 @@ export default function AdminDriverDetailPage() {
           <input name="name" required defaultValue={driver.name} placeholder="Driver name" className="rounded border border-slate-300 px-3 py-2" />
           <input name="email" required type="email" defaultValue={driver.email} placeholder="Driver email" className="rounded border border-slate-300 px-3 py-2" />
           <input name="phone" required defaultValue={driver.phone} placeholder="Driver telephone" className="rounded border border-slate-300 px-3 py-2" />
-          <input name="photoUrl" defaultValue={driver.photoUrl || ""} placeholder="Driver photograph URL" className="rounded border border-slate-300 px-3 py-2" />
+          <div className="sm:col-span-2">
+            <DriverPhotoUploader value={photo} onChange={setPhoto} />
+          </div>
           <input name="carMake" required defaultValue={driver.carMake} placeholder="Car make" className="rounded border border-slate-300 px-3 py-2" />
           <input name="carModel" defaultValue={driver.carModel || ""} placeholder="Car model" className="rounded border border-slate-300 px-3 py-2" />
           <input name="carColour" defaultValue={driver.carColour || ""} placeholder="Car colour" className="rounded border border-slate-300 px-3 py-2" />

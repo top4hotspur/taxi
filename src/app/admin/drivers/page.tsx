@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { formatUkDateTime } from "@/lib/formatting";
+import DriverPhotoUploader from "@/components/DriverPhotoUploader";
 
 type DriverListItem = {
   id: string;
@@ -24,6 +25,7 @@ export default function AdminDriversPage() {
   const [drivers, setDrivers] = useState<DriverListItem[]>([]);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [photo, setPhoto] = useState<{ photoKey: string; photoUrl: string } | null>(null);
 
   async function loadDrivers() {
     const res = await fetch("/api/admin/drivers", { cache: "no-store" });
@@ -67,7 +69,8 @@ export default function AdminDriversPage() {
       name: String(fd.get("name") || "").trim(),
       email: String(fd.get("email") || "").trim(),
       phone: String(fd.get("phone") || "").trim(),
-      photoUrl: String(fd.get("photoUrl") || "").trim(),
+      photoUrl: photo?.photoUrl || "",
+      photoKey: photo?.photoKey || "",
       carMake: String(fd.get("carMake") || "").trim(),
       carModel: String(fd.get("carModel") || "").trim(),
       carColour: String(fd.get("carColour") || "").trim(),
@@ -83,13 +86,14 @@ export default function AdminDriversPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message || "Could not create driver.");
+        setError(data.message || "Driver could not be saved. Please check admin health.");
         return;
       }
       (event.currentTarget as HTMLFormElement).reset();
+      setPhoto(null);
       await loadDrivers();
     } catch {
-      setError("Could not create driver.");
+      setError("Driver could not be saved. Please check admin health.");
     } finally {
       setSaving(false);
     }
@@ -105,7 +109,9 @@ export default function AdminDriversPage() {
           <input name="name" required placeholder="Driver name" className="rounded border border-slate-300 px-3 py-2" />
           <input name="email" required type="email" placeholder="Driver email" className="rounded border border-slate-300 px-3 py-2" />
           <input name="phone" required placeholder="Driver telephone" className="rounded border border-slate-300 px-3 py-2" />
-          <input name="photoUrl" placeholder="Driver photograph URL" className="rounded border border-slate-300 px-3 py-2" />
+          <div className="sm:col-span-2">
+            <DriverPhotoUploader value={photo} onChange={setPhoto} />
+          </div>
           <input name="carMake" required placeholder="Car make" className="rounded border border-slate-300 px-3 py-2" />
           <input name="carModel" placeholder="Car model" className="rounded border border-slate-300 px-3 py-2" />
           <input name="carColour" placeholder="Car colour" className="rounded border border-slate-300 px-3 py-2" />
@@ -130,7 +136,9 @@ export default function AdminDriversPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={driver.photoUrl} alt={driver.name} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-slate-500">No photo</div>
+                  <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-500">
+                    {driver.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "N/A"}
+                  </div>
                 )}
               </div>
               <div className="min-w-0 flex-1 space-y-1">
