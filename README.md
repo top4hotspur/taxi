@@ -70,10 +70,10 @@ Set these in Amplify Hosting (and locally for real sending):
 - `TWILIO_ACCOUNT_SID` (optional, SMS)
 - `TWILIO_AUTH_TOKEN` (optional, SMS)
 - `TWILIO_FROM_NUMBER` (optional, SMS)
-- `TWILIO_WHATSAPP_FROM` (optional, WhatsApp sender, e.g. `whatsapp:+447440368474`)
-- `ENABLE_WHATSAPP_NOTIFICATIONS=true|false`
-- `TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID` (optional)
-- `TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID` (optional)
+- `TWILIO_WHATSAPP_FROM=whatsapp:+447440368474`
+- `ENABLE_WHATSAPP_NOTIFICATIONS=true`
+- `TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID=HX8c0f1f0a60a0892aa215847204be123e`
+- `TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID=HX941ff482954522291ad29810f09c7272`
 - `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos` (required for admin driver photo upload)
 
 If email vars are missing, quote operations still succeed and a structured warning is logged server-side.
@@ -146,6 +146,7 @@ Diagnostics:
 WhatsApp notifications:
 - Email remains the required delivery channel for driver/customer assignment details.
 - WhatsApp is attempted first when enabled/configured; SMS is only attempted as fallback if WhatsApp fails and `TWILIO_FROM_NUMBER` is configured.
+- Business-initiated WhatsApp messages require approved/eligible templates in Twilio.
 - Admin health includes:
   - `twilioAccountSidPresent`
   - `twilioAuthTokenPresent`

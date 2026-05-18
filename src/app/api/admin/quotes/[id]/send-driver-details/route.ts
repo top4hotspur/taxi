@@ -3,6 +3,7 @@ import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { customerDriverDetailsEmail, driverJobDetailsEmail } from "@/lib/email/templates";
+import { formatUkDateTimeFromParts } from "@/lib/formatting";
 import { sendSms, sendWhatsApp } from "@/lib/notifications/twilio";
 
 type ChannelResult = "sent" | "skipped" | "failed";
@@ -19,33 +20,59 @@ type NotificationSummary = {
   detailMessages: string[];
 };
 
-function formatJourneyShort(quote: Awaited<ReturnType<typeof db.findQuoteById>>) {
-  if (!quote) return "";
-  return `${quote.pickupDate} ${quote.pickupTime} ${quote.pickupLocation} -> ${quote.dropoffLocation}`;
+function vehicleSummary(quote: Awaited<ReturnType<typeof db.findQuoteById>>) {
+  if (!quote) return "Not provided";
+  const parts = [quote.assignedVehicleColour, quote.assignedVehicleMake, quote.assignedVehicleRegistration].filter(Boolean);
+  return parts.length ? parts.join(" ") : "Not provided";
 }
 
-function readableSkippedReason(reason?: string) {
+function statusFromReason(reason?: string) {
   switch (reason) {
     case "WHATSAPP_NOT_CONFIGURED":
-      return "not configured";
-    case "WHATSAPP_DISABLED":
-      return "disabled";
-    case "WHATSAPP_INPUT_INVALID":
-      return "invalid phone/message";
-    case "SMS_NOT_CONFIGURED":
-      return "not configured";
-    case "SMS_INPUT_INVALID":
-      return "invalid phone/message";
+      return "WHATSAPP_NOT_CONFIGURED";
+    case "WHATSAPP_TEMPLATE_NOT_CONFIGURED":
+      return "WHATSAPP_TEMPLATE_NOT_CONFIGURED";
+    case "WHATSAPP_TEMPLATE_REJECTED_OR_NOT_APPROVED":
+      return "WHATSAPP_TEMPLATE_REJECTED_OR_NOT_APPROVED";
+    case "WHATSAPP_RECIPIENT_INVALID":
+      return "WHATSAPP_RECIPIENT_INVALID";
+    case "TWILIO_AUTH_FAILED":
+      return "TWILIO_AUTH_FAILED";
+    case "TWILIO_SEND_FAILED":
+      return "TWILIO_SEND_FAILED";
     default:
-      return reason || "skipped";
+      return reason || "TWILIO_SEND_FAILED";
   }
 }
 
-function whatsappFailureMessage(result: { error?: string; reason?: string }) {
-  if (result.reason === "WHATSAPP_TEMPLATE_REQUIRED") {
-    return "approved template required";
-  }
-  return result.error || "Unknown error";
+function mapSkippedReason(reason?: string) {
+  if (reason === "WHATSAPP_NOT_CONFIGURED") return "not configured";
+  if (reason === "WHATSAPP_DISABLED") return "disabled";
+  if (reason === "WHATSAPP_TEMPLATE_NOT_CONFIGURED") return "template not configured";
+  if (reason === "WHATSAPP_RECIPIENT_INVALID") return "recipient invalid";
+  return reason || "skipped";
+}
+
+function formatJourneyDateTime(quote: NonNullable<Awaited<ReturnType<typeof db.findQuoteById>>>) {
+  return formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime);
+}
+
+function customerPhoneCandidates(params: {
+  quote: NonNullable<Awaited<ReturnType<typeof db.findQuoteById>>>;
+  profilePhone?: string;
+  profileWhatsApp?: string;
+}) {
+  const q = params.quote as unknown as Record<string, unknown>;
+  return [
+    String(q.phone || "").trim(),
+    String(q.bookerPhone || "").trim(),
+    String(q.customerPhone || "").trim(),
+    String(params.quote.guestPhone || "").trim(),
+    String(params.profilePhone || "").trim(),
+    String(params.profileWhatsApp || "").trim(),
+    String(params.quote.passengerPhone || "").trim(),
+    String(params.quote.leadPassengerPhone || "").trim(),
+  ].find((value) => Boolean(value));
 }
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -74,10 +101,18 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     detailMessages: [],
   };
 
-  const customerEmailTo = (quote.guestEmail || (quote.customerId ? (await db.findUserById(quote.customerId))?.email : "") || "").trim();
-  const customerPhoneTo = (quote.guestPhone || quote.passengerPhone || "").trim();
-  const driverEmailTo = (quote.assignedDriverEmail || "").trim();
-  const driverPhoneTo = (quote.assignedDriverPhone || "").trim();
+  const customerUser = quote.customerId ? await db.findUserById(quote.customerId) : null;
+  const customerProfile = quote.customerId ? await db.getCustomerProfileByUserId(quote.customerId) : null;
+  const assignedDriverProfile = quote.assignedDriverId ? await db.getDriverProfileById(quote.assignedDriverId) : null;
+
+  const customerEmailTo = (quote.guestEmail || customerUser?.email || "").trim();
+  const customerPhoneTo = customerPhoneCandidates({
+    quote,
+    profilePhone: customerProfile?.phone,
+    profileWhatsApp: (customerProfile as unknown as { whatsapp?: string } | undefined)?.whatsapp,
+  }) || "";
+  const driverEmailTo = (quote.assignedDriverEmail || assignedDriverProfile?.email || "").trim();
+  const driverPhoneTo = (quote.assignedDriverPhone || assignedDriverProfile?.mobile || "").trim();
 
   const nowIso = new Date().toISOString();
   let customerDriverEmailSentAt: string | undefined;
@@ -86,10 +121,10 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   let driverJobSmsSentAt: string | undefined;
   let customerWhatsAppSentAt: string | undefined;
   let driverWhatsAppSentAt: string | undefined;
-  let customerWhatsAppStatus = quote.customerWhatsAppStatus || "SKIPPED";
-  let driverWhatsAppStatus = quote.driverWhatsAppStatus || "SKIPPED";
-  let customerWhatsAppError = quote.customerWhatsAppError;
-  let driverWhatsAppError = quote.driverWhatsAppError;
+  let customerWhatsAppStatus: "SENT" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED" = "SKIPPED";
+  let driverWhatsAppStatus: "SENT" | "SKIPPED" | "SKIPPED_NO_DRIVER_PHONE" | "FAILED" = "SKIPPED";
+  let customerWhatsAppError: string | undefined;
+  let driverWhatsAppError: string | undefined;
 
   if (customerEmailTo) {
     try {
@@ -111,58 +146,60 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     summary.detailMessages.push("Customer email skipped: no customer email available.");
   }
 
-  if (customerPhoneTo) {
-    const customerTemplateSid = process.env.TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID?.trim();
-    const whatsapp = await sendWhatsApp({
+  const customerTemplateSid = process.env.TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID?.trim();
+  if (!customerPhoneTo) {
+    summary.customerWhatsApp = "skipped";
+    customerWhatsAppStatus = "SKIPPED_NO_CUSTOMER_PHONE";
+    customerWhatsAppError = "SKIPPED_NO_CUSTOMER_PHONE";
+    summary.detailMessages.push("Customer WhatsApp skipped: no customer phone available.");
+  } else {
+    const wa = await sendWhatsApp({
       to: customerPhoneTo,
-      body: `NI Taxi Co: Your driver is ${quote.assignedDriverName}. Vehicle: ${quote.assignedVehicleColour || ""} ${quote.assignedVehicleMake || "vehicle"} ${quote.assignedVehicleRegistration || ""}. Driver phone: ${quote.assignedDriverPhone}. Journey: ${formatJourneyShort(quote)}. Please keep these details available.`,
-      contentSid: customerTemplateSid || undefined,
-      contentVariables: customerTemplateSid
-        ? {
-            "1": quote.assignedDriverName || "Driver",
-            "2": `${quote.assignedVehicleColour || ""} ${quote.assignedVehicleMake || "vehicle"} ${quote.assignedVehicleRegistration || ""}`.trim(),
-            "3": quote.assignedDriverPhone || "",
-            "4": `${quote.pickupDate} ${quote.pickupTime}`,
-          }
-        : undefined,
+      contentSid: customerTemplateSid,
+      contentVariables: {
+        "1": quote.assignedDriverName || "Not provided",
+        "2": quote.assignedDriverPhone || "Not provided",
+        "3": vehicleSummary(quote),
+        "4": quote.pickupLocation || "See email",
+        "5": quote.dropoffLocation || "See email",
+        "6": formatJourneyDateTime(quote),
+      },
     });
-    if (whatsapp.ok) {
+
+    if (wa.ok) {
       summary.customerWhatsApp = "sent";
-      customerWhatsAppSentAt = nowIso;
       customerWhatsAppStatus = "SENT";
+      customerWhatsAppSentAt = nowIso;
       customerWhatsAppError = undefined;
-    } else if (whatsapp.skipped) {
+    } else if (wa.skipped) {
       summary.customerWhatsApp = "skipped";
       customerWhatsAppStatus = "SKIPPED";
-      customerWhatsAppError = readableSkippedReason(whatsapp.reason);
-      summary.detailMessages.push(`Customer WhatsApp skipped: ${readableSkippedReason(whatsapp.reason)}`);
+      customerWhatsAppError = statusFromReason(wa.reason);
+      summary.detailMessages.push(`Customer WhatsApp skipped: ${mapSkippedReason(wa.reason)}`);
     } else {
       summary.customerWhatsApp = "failed";
       customerWhatsAppStatus = "FAILED";
-      customerWhatsAppError = whatsappFailureMessage(whatsapp);
+      customerWhatsAppError = statusFromReason(wa.reason);
       summary.detailMessages.push(`Customer WhatsApp failed: ${customerWhatsAppError}`);
 
-      summary.customerSmsAttempted = true;
-      const smsFallback = await sendSms({
-        to: customerPhoneTo,
-        body: `NI Taxi Co: Your driver is ${quote.assignedDriverName}, ${quote.assignedVehicleColour || ""} ${quote.assignedVehicleMake || "vehicle"} reg ${quote.assignedVehicleRegistration || "TBC"}. Driver phone: ${quote.assignedDriverPhone}. Journey: ${formatJourneyShort(quote)}.`,
-      });
-      if (smsFallback.ok) {
-        summary.customerSms = "sent";
-        customerDriverSmsSentAt = nowIso;
-      } else if (smsFallback.skipped) {
-        summary.customerSms = "skipped";
-        summary.detailMessages.push(`Customer SMS skipped: ${readableSkippedReason(smsFallback.reason)}`);
-      } else {
-        summary.customerSms = "failed";
-        summary.detailMessages.push(`Customer SMS failed: ${smsFallback.error || "Unknown error"}`);
+      if (process.env.TWILIO_FROM_NUMBER?.trim()) {
+        summary.customerSmsAttempted = true;
+        const smsFallback = await sendSms({
+          to: customerPhoneTo,
+          body: `NI Taxi Co: Your driver is ${quote.assignedDriverName}. Driver phone: ${quote.assignedDriverPhone}. Journey: ${formatJourneyDateTime(quote)}.`,
+        });
+        if (smsFallback.ok) {
+          summary.customerSms = "sent";
+          customerDriverSmsSentAt = nowIso;
+        } else if (smsFallback.skipped) {
+          summary.customerSms = "skipped";
+          summary.detailMessages.push(`Customer SMS skipped: ${mapSkippedReason(smsFallback.reason)}`);
+        } else {
+          summary.customerSms = "failed";
+          summary.detailMessages.push(`Customer SMS failed: ${smsFallback.error || "Unknown error"}`);
+        }
       }
     }
-  } else {
-    summary.customerWhatsApp = "skipped";
-    customerWhatsAppStatus = "SKIPPED";
-    customerWhatsAppError = "no customer phone available";
-    summary.detailMessages.push("Customer WhatsApp skipped: no customer phone available.");
   }
 
   if (driverEmailTo) {
@@ -185,83 +222,94 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     summary.detailMessages.push("Driver email skipped: no driver email available.");
   }
 
-  if (driverPhoneTo) {
-    const driverTemplateSid = process.env.TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID?.trim();
-    const whatsapp = await sendWhatsApp({
+  const driverTemplateSid = process.env.TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID?.trim();
+  if (!driverPhoneTo) {
+    summary.driverWhatsApp = "skipped";
+    driverWhatsAppStatus = "SKIPPED_NO_DRIVER_PHONE";
+    driverWhatsAppError = "SKIPPED_NO_DRIVER_PHONE";
+    summary.detailMessages.push("Driver WhatsApp skipped: no driver phone available.");
+  } else {
+    const wa = await sendWhatsApp({
       to: driverPhoneTo,
-      body: `NI Taxi Co job: ${quote.pickupDate} ${quote.pickupTime}. Pickup: ${quote.pickupLocation}. Drop-off: ${quote.dropoffLocation}. Passenger: ${(quote.guestName || quote.passengerName || "Customer")} ${quote.guestPhone || quote.passengerPhone || ""}. Check your email for full details.`,
-      contentSid: driverTemplateSid || undefined,
-      contentVariables: driverTemplateSid
-        ? {
-            "1": `${quote.pickupDate} ${quote.pickupTime}`,
-            "2": quote.pickupLocation,
-            "3": quote.dropoffLocation,
-            "4": quote.guestName || quote.passengerName || "Customer",
-            "5": quote.guestPhone || quote.passengerPhone || "",
-          }
-        : undefined,
+      contentSid: driverTemplateSid,
+      contentVariables: {
+        "1": formatJourneyDateTime(quote),
+        "2": quote.pickupLocation || "See email",
+        "3": quote.dropoffLocation || "See email",
+        "4": quote.guestName || quote.passengerName || "Not provided",
+        "5": quote.guestPhone || quote.passengerPhone || "Not provided",
+      },
     });
-    if (whatsapp.ok) {
+
+    if (wa.ok) {
       summary.driverWhatsApp = "sent";
-      driverWhatsAppSentAt = nowIso;
       driverWhatsAppStatus = "SENT";
+      driverWhatsAppSentAt = nowIso;
       driverWhatsAppError = undefined;
-    } else if (whatsapp.skipped) {
+    } else if (wa.skipped) {
       summary.driverWhatsApp = "skipped";
       driverWhatsAppStatus = "SKIPPED";
-      driverWhatsAppError = readableSkippedReason(whatsapp.reason);
-      summary.detailMessages.push(`Driver WhatsApp skipped: ${readableSkippedReason(whatsapp.reason)}`);
+      driverWhatsAppError = statusFromReason(wa.reason);
+      summary.detailMessages.push(`Driver WhatsApp skipped: ${mapSkippedReason(wa.reason)}`);
     } else {
       summary.driverWhatsApp = "failed";
       driverWhatsAppStatus = "FAILED";
-      driverWhatsAppError = whatsappFailureMessage(whatsapp);
+      driverWhatsAppError = statusFromReason(wa.reason);
       summary.detailMessages.push(`Driver WhatsApp failed: ${driverWhatsAppError}`);
 
-      summary.driverSmsAttempted = true;
-      const smsFallback = await sendSms({
-        to: driverPhoneTo,
-        body: `NI Taxi Co job: ${quote.pickupDate} ${quote.pickupTime}. Pickup ${quote.pickupLocation}. Drop-off ${quote.dropoffLocation}. Passenger: ${(quote.guestName || quote.passengerName || "Customer")} ${quote.guestPhone || quote.passengerPhone || ""}. Check email/admin for full details.`,
-      });
-      if (smsFallback.ok) {
-        summary.driverSms = "sent";
-        driverJobSmsSentAt = nowIso;
-      } else if (smsFallback.skipped) {
-        summary.driverSms = "skipped";
-        summary.detailMessages.push(`Driver SMS skipped: ${readableSkippedReason(smsFallback.reason)}`);
-      } else {
-        summary.driverSms = "failed";
-        summary.detailMessages.push(`Driver SMS failed: ${smsFallback.error || "Unknown error"}`);
+      if (process.env.TWILIO_FROM_NUMBER?.trim()) {
+        summary.driverSmsAttempted = true;
+        const smsFallback = await sendSms({
+          to: driverPhoneTo,
+          body: `NI Taxi Co job: ${formatJourneyDateTime(quote)}. Pickup ${quote.pickupLocation}. Drop-off ${quote.dropoffLocation}. Check email for full details.`,
+        });
+        if (smsFallback.ok) {
+          summary.driverSms = "sent";
+          driverJobSmsSentAt = nowIso;
+        } else if (smsFallback.skipped) {
+          summary.driverSms = "skipped";
+          summary.detailMessages.push(`Driver SMS skipped: ${mapSkippedReason(smsFallback.reason)}`);
+        } else {
+          summary.driverSms = "failed";
+          summary.detailMessages.push(`Driver SMS failed: ${smsFallback.error || "Unknown error"}`);
+        }
       }
     }
-  } else {
-    summary.driverWhatsApp = "skipped";
-    driverWhatsAppStatus = "SKIPPED";
-    driverWhatsAppError = "no driver phone available";
-    summary.detailMessages.push("Driver WhatsApp skipped: no driver phone available.");
   }
 
-  const requiredEmailFailed = summary.customerEmail !== "sent" || summary.driverEmail !== "sent";
+  const requiredSentCount = [summary.customerEmail, summary.driverEmail].filter((s) => s === "sent").length;
+  const requiredFailedCount = [summary.customerEmail, summary.driverEmail].filter((s) => s === "failed").length;
+  const optionalFailures = [summary.customerWhatsApp, summary.driverWhatsApp, summary.customerSms, summary.driverSms].includes("failed");
+
+  let assignmentStatus: "DETAILS_SENT" | "PARTIALLY_SENT" | "FAILED_TO_SEND" = "DETAILS_SENT";
+  if (requiredFailedCount === 2) {
+    assignmentStatus = "FAILED_TO_SEND";
+  } else if (requiredSentCount >= 1 && (requiredFailedCount > 0 || optionalFailures)) {
+    assignmentStatus = "PARTIALLY_SENT";
+  }
 
   const updated = await db.updateQuote(id, {
-    assignmentStatus: requiredEmailFailed ? "FAILED_TO_SEND" : "DETAILS_SENT",
-    driverDetailsSentAt: summary.customerEmail === "sent" ? nowIso : quote.driverDetailsSentAt,
-    driverJobSentAt: summary.driverEmail === "sent" ? nowIso : quote.driverJobSentAt,
-    customerDriverEmailSentAt: customerDriverEmailSentAt || quote.customerDriverEmailSentAt,
-    customerDriverSmsSentAt: customerDriverSmsSentAt || quote.customerDriverSmsSentAt,
-    driverJobEmailSentAt: driverJobEmailSentAt || quote.driverJobEmailSentAt,
-    driverJobSmsSentAt: driverJobSmsSentAt || quote.driverJobSmsSentAt,
-    customerWhatsAppSentAt: customerWhatsAppSentAt || quote.customerWhatsAppSentAt,
-    driverWhatsAppSentAt: driverWhatsAppSentAt || quote.driverWhatsAppSentAt,
+    assignmentStatus,
+    driverDetailsSentAt: summary.customerEmail === "sent" ? nowIso : undefined,
+    driverJobSentAt: summary.driverEmail === "sent" ? nowIso : undefined,
+    customerDriverEmailSentAt,
+    customerDriverSmsSentAt: customerDriverSmsSentAt || undefined,
+    driverJobEmailSentAt,
+    driverJobSmsSentAt: driverJobSmsSentAt || undefined,
+    customerWhatsAppSentAt: customerWhatsAppSentAt || undefined,
+    driverWhatsAppSentAt: driverWhatsAppSentAt || undefined,
     customerWhatsAppStatus,
     driverWhatsAppStatus,
     customerWhatsAppError,
     driverWhatsAppError,
-    lastCommunicationError: requiredEmailFailed ? summary.detailMessages.join(" | ").slice(0, 1000) : undefined,
+    lastCommunicationError: summary.detailMessages.length ? summary.detailMessages.join(" | ").slice(0, 1000) : undefined,
   });
 
-  const topLevelMessage = requiredEmailFailed
-    ? "Required email notifications failed. Please review below."
-    : "Required emails sent. WhatsApp/SMS results are shown below.";
+  const topLevelMessage = assignmentStatus === "DETAILS_SENT"
+    ? "Required emails sent. WhatsApp results are shown below."
+    : assignmentStatus === "PARTIALLY_SENT"
+      ? "Partially sent. Required emails delivered, but some channels had issues."
+      : "Required emails failed. Please review below.";
 
   return NextResponse.json({
     success: true,

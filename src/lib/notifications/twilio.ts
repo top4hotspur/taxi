@@ -5,6 +5,8 @@ export type TwilioChannelResult = {
   providerMessageId?: string;
   error?: string;
   errorCode?: string;
+  twilioStatus?: number | null;
+  twilioErrorCode?: string | null;
 };
 
 export type SendPhoneMessageInput = {
@@ -36,12 +38,33 @@ function twilioBaseConfigured() {
   return Boolean(process.env.TWILIO_ACCOUNT_SID?.trim() && process.env.TWILIO_AUTH_TOKEN?.trim());
 }
 
-function whatsappConfigured() {
-  return Boolean(twilioBaseConfigured() && process.env.TWILIO_WHATSAPP_FROM?.trim() && whatsappEnabled());
+function whatsappFromConfigured() {
+  return Boolean(process.env.TWILIO_WHATSAPP_FROM?.trim());
+}
+
+function whatsappTemplateConfigured(kind: "customer" | "driver") {
+  const value = kind === "customer"
+    ? process.env.TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID?.trim()
+    : process.env.TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID?.trim();
+  return Boolean(value);
 }
 
 function smsConfigured() {
   return Boolean(twilioBaseConfigured() && process.env.TWILIO_FROM_NUMBER?.trim());
+}
+
+function mapTwilioError(result: TwilioChannelResult): TwilioChannelResult {
+  const text = `${result.error || ""} ${result.errorCode || ""}`.toLowerCase();
+  if (text.includes("authenticate") || text.includes("auth")) {
+    return { ...result, reason: "TWILIO_AUTH_FAILED" };
+  }
+  if (text.includes("template") || text.includes("contentsid")) {
+    return { ...result, reason: "WHATSAPP_TEMPLATE_REJECTED_OR_NOT_APPROVED" };
+  }
+  if (text.includes("to") || text.includes("recipient") || text.includes("phone") || text.includes("whatsapp")) {
+    return { ...result, reason: "WHATSAPP_RECIPIENT_INVALID" };
+  }
+  return { ...result, reason: "TWILIO_SEND_FAILED" };
 }
 
 async function sendTwilioMessage(params: {
@@ -83,26 +106,42 @@ async function sendTwilioMessage(params: {
   if (!response.ok) {
     const errorText = payload?.message || `HTTP_${response.status}`;
     const errorCode = payload?.code ? String(payload.code) : undefined;
-    return { ok: false, error: errorText, errorCode } as TwilioChannelResult;
+    return {
+      ok: false,
+      error: errorText,
+      errorCode,
+      twilioStatus: response.status,
+      twilioErrorCode: errorCode || null,
+    } as TwilioChannelResult;
   }
 
-  return { ok: true, providerMessageId: payload?.sid } as TwilioChannelResult;
+  return {
+    ok: true,
+    providerMessageId: payload?.sid,
+    twilioStatus: response.status,
+  } as TwilioChannelResult;
 }
 
 export async function sendWhatsApp(input: SendPhoneMessageInput): Promise<TwilioChannelResult> {
   const normalized = normalizePhone(input.to);
-  if (!normalized || (!input.body && !input.contentSid)) {
+  if (!normalized) {
+    return { ok: false, skipped: true, reason: "WHATSAPP_RECIPIENT_INVALID" };
+  }
+  if (!input.body && !input.contentSid) {
     return { ok: false, skipped: true, reason: "WHATSAPP_INPUT_INVALID" };
   }
   if (!whatsappEnabled()) {
     return { ok: false, skipped: true, reason: "WHATSAPP_DISABLED" };
   }
-  if (!whatsappConfigured()) {
+  if (!twilioBaseConfigured() || !whatsappFromConfigured()) {
     return { ok: false, skipped: true, reason: "WHATSAPP_NOT_CONFIGURED" };
+  }
+  if (!input.contentSid) {
+    return { ok: false, skipped: true, reason: "WHATSAPP_TEMPLATE_NOT_CONFIGURED" };
   }
 
   const from = process.env.TWILIO_WHATSAPP_FROM!.trim();
-  const to = `whatsapp:${normalized}`;
+  const to = normalized.toLowerCase().startsWith("whatsapp:") ? normalized : `whatsapp:${normalized}`;
   const result = await sendTwilioMessage({
     to,
     from,
@@ -110,9 +149,8 @@ export async function sendWhatsApp(input: SendPhoneMessageInput): Promise<Twilio
     contentSid: input.contentSid,
     contentVariables: input.contentVariables,
   });
-  if (!result.ok && result.error?.toLowerCase().includes("template") && !input.contentSid) {
-    return { ...result, reason: "WHATSAPP_TEMPLATE_REQUIRED" };
-  }
+
+  if (!result.ok) return mapTwilioError(result);
   return result;
 }
 
@@ -139,6 +177,8 @@ export function getTwilioNotificationHealth() {
   const whatsappFromPresent = Boolean(process.env.TWILIO_WHATSAPP_FROM?.trim());
   const whatsappNotificationsEnabled = whatsappEnabled();
   const smsFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
+  const customerWhatsAppTemplatePresent = whatsappTemplateConfigured("customer");
+  const driverWhatsAppTemplatePresent = whatsappTemplateConfigured("driver");
 
   return {
     twilioAccountSidPresent,
@@ -146,7 +186,15 @@ export function getTwilioNotificationHealth() {
     whatsappFromPresent,
     whatsappNotificationsEnabled,
     smsFromNumberPresent,
-    whatsappConfigured: twilioAccountSidPresent && twilioAuthTokenPresent && whatsappFromPresent && whatsappNotificationsEnabled,
+    customerWhatsAppTemplatePresent,
+    driverWhatsAppTemplatePresent,
+    whatsappConfigured:
+      twilioAccountSidPresent &&
+      twilioAuthTokenPresent &&
+      whatsappFromPresent &&
+      whatsappNotificationsEnabled &&
+      customerWhatsAppTemplatePresent &&
+      driverWhatsAppTemplatePresent,
   };
 }
 

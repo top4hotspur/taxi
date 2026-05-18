@@ -8,26 +8,63 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { to?: string; message?: string };
+  const body = (await request.json().catch(() => ({}))) as { to?: string; template?: "customer" | "driver"; message?: string };
   const to = String(body.to || "").trim();
+  const template = body.template || "customer";
   const message = String(body.message || "NI Taxi Co WhatsApp test message.").trim();
 
   if (!to) {
     return NextResponse.json({ ok: false, errorCode: "TO_REQUIRED", message: "Recipient number is required." }, { status: 400 });
   }
 
-  const result = await sendWhatsApp({ to, body: message });
+  const customerSid = process.env.TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID?.trim();
+  const driverSid = process.env.TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID?.trim();
+
+  const result = await sendWhatsApp(
+    template === "driver"
+      ? {
+          to,
+          contentSid: driverSid,
+          contentVariables: {
+            "1": "28/05/2026 16:06",
+            "2": "Belfast City Airport",
+            "3": "16 Cregagh Park",
+            "4": "Steven Glass",
+            "5": "07917221111",
+          },
+        }
+      : {
+          to,
+          contentSid: customerSid,
+          contentVariables: {
+            "1": "Steven Glass",
+            "2": "07917221111",
+            "3": "Grey Ford Galaxy GX16LYR",
+            "4": "Belfast City Airport",
+            "5": "16 Cregagh Park",
+            "6": "28/05/2026 16:06",
+          },
+          body: message,
+        }
+  );
+
   if (result.ok) {
-    return NextResponse.json({ ok: true, providerMessageId: result.providerMessageId || null });
+    return NextResponse.json({
+      ok: true,
+      status: "sent",
+      messageSid: result.providerMessageId || null,
+      twilioStatus: result.twilioStatus ?? null,
+    });
   }
 
   if (result.skipped) {
     return NextResponse.json(
       {
         ok: false,
-        errorCode: "WHATSAPP_SKIPPED",
-        message: "WhatsApp test skipped.",
-        reason: result.reason || null,
+        status: "skipped",
+        errorCode: result.reason || "WHATSAPP_SKIPPED",
+        twilioStatus: result.twilioStatus ?? null,
+        twilioErrorCode: result.twilioErrorCode ?? result.errorCode ?? null,
       },
       { status: 400 }
     );
@@ -36,10 +73,10 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       ok: false,
-      errorCode: "WHATSAPP_SEND_FAILED",
-      message: result.reason === "WHATSAPP_TEMPLATE_REQUIRED" ? "WhatsApp failed: approved template required." : "WhatsApp test failed.",
-      reason: result.reason || null,
-      providerErrorCode: result.errorCode || null,
+      status: "failed",
+      errorCode: result.reason || "TWILIO_SEND_FAILED",
+      twilioStatus: result.twilioStatus ?? null,
+      twilioErrorCode: result.twilioErrorCode ?? result.errorCode ?? null,
     },
     { status: 502 }
   );

@@ -46,7 +46,7 @@ type Quote = {
   assignedVehicleMake?: string;
   assignedVehicleColour?: string;
   assignedVehicleRegistration?: string;
-  assignmentStatus?: "NOT_ASSIGNED" | "ASSIGNED" | "DETAILS_SENT" | "FAILED_TO_SEND";
+  assignmentStatus?: "NOT_ASSIGNED" | "ASSIGNED" | "DETAILS_SENT" | "PARTIALLY_SENT" | "FAILED_TO_SEND";
   driverDetailsSentAt?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
