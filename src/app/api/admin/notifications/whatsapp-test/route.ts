@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
-import { sendWhatsApp } from "@/lib/notifications/twilio";
+import { normalizePhoneForDisplay, sendWhatsApp } from "@/lib/notifications/twilio";
 
 export async function POST(request: Request) {
   const user = await getCurrentSessionUser();
@@ -19,12 +19,16 @@ export async function POST(request: Request) {
 
   const customerSid = process.env.TWILIO_WHATSAPP_CUSTOMER_DRIVER_TEMPLATE_SID?.trim();
   const driverSid = process.env.TWILIO_WHATSAPP_DRIVER_JOB_TEMPLATE_SID?.trim();
+  const templateSid = template === "driver" ? driverSid : customerSid;
+  const normalizedRecipient = normalizePhoneForDisplay(to);
+  const fromLooksValid = String(process.env.TWILIO_WHATSAPP_FROM || "").trim().toLowerCase().startsWith("whatsapp:+");
+  const templateSidLooksValid = Boolean(templateSid && /^HX[a-zA-Z0-9]{32}$/.test(templateSid));
 
   const result = await sendWhatsApp(
     template === "driver"
       ? {
           to,
-          contentSid: driverSid,
+          contentSid: templateSid,
           contentVariables: {
             "1": "28/05/2026 16:06",
             "2": "Belfast City Airport",
@@ -35,7 +39,7 @@ export async function POST(request: Request) {
         }
       : {
           to,
-          contentSid: customerSid,
+          contentSid: templateSid,
           contentVariables: {
             "1": "Steven Glass",
             "2": "07917221111",
@@ -51,9 +55,13 @@ export async function POST(request: Request) {
   if (result.ok) {
     return NextResponse.json({
       ok: true,
-      status: "sent",
+      status: "queued",
       messageSid: result.providerMessageId || null,
       twilioStatus: result.twilioStatus ?? null,
+      normalizedRecipient,
+      templateSidPresent: Boolean(templateSid),
+      templateSidLooksValid,
+      fromLooksValid,
     });
   }
 
@@ -63,8 +71,13 @@ export async function POST(request: Request) {
         ok: false,
         status: "skipped",
         errorCode: result.reason || "WHATSAPP_SKIPPED",
+        safeMessage: result.safeMessage || result.error || "WhatsApp was skipped.",
         twilioStatus: result.twilioStatus ?? null,
         twilioErrorCode: result.twilioErrorCode ?? result.errorCode ?? null,
+        normalizedRecipient,
+        templateSidPresent: Boolean(templateSid),
+        templateSidLooksValid,
+        fromLooksValid,
       },
       { status: 400 }
     );
@@ -75,8 +88,13 @@ export async function POST(request: Request) {
       ok: false,
       status: "failed",
       errorCode: result.reason || "TWILIO_SEND_FAILED",
+      safeMessage: result.safeMessage || result.error || "WhatsApp send failed.",
       twilioStatus: result.twilioStatus ?? null,
       twilioErrorCode: result.twilioErrorCode ?? result.errorCode ?? null,
+      normalizedRecipient,
+      templateSidPresent: Boolean(templateSid),
+      templateSidLooksValid,
+      fromLooksValid,
     },
     { status: 502 }
   );

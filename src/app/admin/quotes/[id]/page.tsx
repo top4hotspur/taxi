@@ -29,15 +29,35 @@ type Quote = {
   driverDetailsSentAt?: string;
   driverJobSentAt?: string;
   customerDriverEmailSentAt?: string;
+  customerDriverEmailStatus?: "SENT" | "SKIPPED" | "FAILED";
+  customerDriverEmailProviderMessageId?: string;
+  customerDriverEmailRecipient?: string;
+  customerDriverEmailError?: string;
+  customerDriverEmailErrorCode?: string;
   customerDriverSmsSentAt?: string;
   customerWhatsAppSentAt?: string;
-  customerWhatsAppStatus?: "SENT" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED";
+  customerWhatsAppStatus?: "SENT" | "QUEUED" | "DELIVERED" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED";
   customerWhatsAppError?: string;
+  customerWhatsAppMessageSid?: string;
+  customerWhatsAppTwilioStatus?: string;
+  customerWhatsAppTwilioErrorCode?: string;
+  customerWhatsAppRecipient?: string;
+  customerWhatsAppTemplateSid?: string;
   driverJobEmailSentAt?: string;
+  driverJobEmailStatus?: "SENT" | "SKIPPED" | "FAILED";
+  driverJobEmailProviderMessageId?: string;
+  driverJobEmailRecipient?: string;
+  driverJobEmailError?: string;
+  driverJobEmailErrorCode?: string;
   driverJobSmsSentAt?: string;
   driverWhatsAppSentAt?: string;
-  driverWhatsAppStatus?: "SENT" | "SKIPPED" | "SKIPPED_NO_DRIVER_PHONE" | "FAILED";
+  driverWhatsAppStatus?: "SENT" | "QUEUED" | "DELIVERED" | "SKIPPED" | "SKIPPED_NO_DRIVER_PHONE" | "FAILED";
   driverWhatsAppError?: string;
+  driverWhatsAppMessageSid?: string;
+  driverWhatsAppTwilioStatus?: string;
+  driverWhatsAppTwilioErrorCode?: string;
+  driverWhatsAppRecipient?: string;
+  driverWhatsAppTemplateSid?: string;
   lastCommunicationError?: string;
   paymentStatus?: "NOT_REQUIRED" | "PAYMENT_REQUIRED" | "PAID" | "PAYMENT_FAILED" | "REFUNDED";
   paymentProvider?: "SQUARE";
@@ -166,6 +186,12 @@ export default function AdminQuoteDetailPage() {
       driverWhatsApp: string;
       driverSms: string;
       driverSmsAttempted: boolean;
+      customerEmailMessageId?: string | null;
+      driverEmailMessageId?: string | null;
+      customerWhatsAppMessageSid?: string | null;
+      driverWhatsAppMessageSid?: string | null;
+      customerWhatsAppTwilioStatus?: string | null;
+      driverWhatsAppTwilioStatus?: string | null;
       detailMessages: string[];
     };
   } | null>(null);
@@ -464,16 +490,27 @@ export default function AdminQuoteDetailPage() {
           {quote.assignedAt ? fieldRow("Assigned at", formatUkDateTime(quote.assignedAt)) : null}
           {quote.driverDetailsSentAt ? fieldRow("Customer details sent", formatUkDateTime(quote.driverDetailsSentAt)) : null}
           {quote.driverJobSentAt ? fieldRow("Driver job sent", formatUkDateTime(quote.driverJobSentAt)) : null}
-          {quote.customerDriverEmailSentAt ? fieldRow("Customer email sent", formatUkDateTime(quote.customerDriverEmailSentAt)) : null}
-          {quote.customerWhatsAppSentAt ? fieldRow("Customer WhatsApp sent", formatUkDateTime(quote.customerWhatsAppSentAt)) : null}
-          {quote.customerWhatsAppStatus ? fieldRow("Customer WhatsApp status", quote.customerWhatsAppStatus) : null}
-          {quote.customerWhatsAppError ? fieldRow("Customer WhatsApp error", quote.customerWhatsAppError) : null}
-          {quote.customerDriverSmsSentAt ? fieldRow("Customer SMS sent", formatUkDateTime(quote.customerDriverSmsSentAt)) : null}
-          {quote.driverJobEmailSentAt ? fieldRow("Driver email sent", formatUkDateTime(quote.driverJobEmailSentAt)) : null}
-          {quote.driverWhatsAppSentAt ? fieldRow("Driver WhatsApp sent", formatUkDateTime(quote.driverWhatsAppSentAt)) : null}
-          {quote.driverWhatsAppStatus ? fieldRow("Driver WhatsApp status", quote.driverWhatsAppStatus) : null}
-          {quote.driverWhatsAppError ? fieldRow("Driver WhatsApp error", quote.driverWhatsAppError) : null}
-          {quote.driverJobSmsSentAt ? fieldRow("Driver SMS sent", formatUkDateTime(quote.driverJobSmsSentAt)) : null}
+          {fieldRow("Customer email", quote.customerDriverEmailStatus || "Not attempted")}
+          {quote.customerDriverEmailRecipient ? fieldRow("Customer email recipient", quote.customerDriverEmailRecipient) : null}
+          {quote.customerDriverEmailProviderMessageId ? fieldRow("Customer email message ID", quote.customerDriverEmailProviderMessageId) : null}
+          {quote.customerDriverEmailErrorCode || quote.customerDriverEmailError ? fieldRow("Customer email error", `${quote.customerDriverEmailErrorCode || ""} ${quote.customerDriverEmailError || ""}`.trim()) : null}
+          {fieldRow("Customer WhatsApp", quote.customerWhatsAppStatus || "Not attempted")}
+          {quote.customerWhatsAppRecipient ? fieldRow("Customer WhatsApp recipient", quote.customerWhatsAppRecipient) : null}
+          {quote.customerWhatsAppMessageSid ? fieldRow("Customer WhatsApp SID", quote.customerWhatsAppMessageSid) : null}
+          {quote.customerWhatsAppTwilioStatus ? fieldRow("Customer WhatsApp Twilio status", quote.customerWhatsAppTwilioStatus) : null}
+          {quote.customerWhatsAppTemplateSid ? fieldRow("Customer WhatsApp template", quote.customerWhatsAppTemplateSid) : null}
+          {quote.customerWhatsAppTwilioErrorCode || quote.customerWhatsAppError ? fieldRow("Customer WhatsApp error", `${quote.customerWhatsAppTwilioErrorCode || ""} ${quote.customerWhatsAppError || ""}`.trim()) : null}
+          {fieldRow("Driver email", quote.driverJobEmailStatus || "Not attempted")}
+          {quote.driverJobEmailRecipient ? fieldRow("Driver email recipient", quote.driverJobEmailRecipient) : null}
+          {quote.driverJobEmailProviderMessageId ? fieldRow("Driver email message ID", quote.driverJobEmailProviderMessageId) : null}
+          {quote.driverJobEmailErrorCode || quote.driverJobEmailError ? fieldRow("Driver email error", `${quote.driverJobEmailErrorCode || ""} ${quote.driverJobEmailError || ""}`.trim()) : null}
+          {fieldRow("Driver WhatsApp", quote.driverWhatsAppStatus || "Not attempted")}
+          {quote.driverWhatsAppRecipient ? fieldRow("Driver WhatsApp recipient", quote.driverWhatsAppRecipient) : null}
+          {quote.driverWhatsAppMessageSid ? fieldRow("Driver WhatsApp SID", quote.driverWhatsAppMessageSid) : null}
+          {quote.driverWhatsAppTwilioStatus ? fieldRow("Driver WhatsApp Twilio status", quote.driverWhatsAppTwilioStatus) : null}
+          {quote.driverWhatsAppTemplateSid ? fieldRow("Driver WhatsApp template", quote.driverWhatsAppTemplateSid) : null}
+          {quote.driverWhatsAppTwilioErrorCode || quote.driverWhatsAppError ? fieldRow("Driver WhatsApp error", `${quote.driverWhatsAppTwilioErrorCode || ""} ${quote.driverWhatsAppError || ""}`.trim()) : null}
+          <p className="text-xs text-slate-500">Email is the required channel. WhatsApp is optional until templates are approved and delivery is confirmed.</p>
           {quote.lastCommunicationError ? fieldRow("Last communication error", quote.lastCommunicationError) : null}
 
           {isPaid ? (

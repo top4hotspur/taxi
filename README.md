@@ -156,7 +156,21 @@ WhatsApp notifications:
   - `whatsappConfigured`
 - Admin-only test endpoint:
   - `POST /api/admin/notifications/whatsapp-test`
-  - body: `{ "to": "+4479...", "message": "..." }`
+  - body: `{ "to": "+4479...", "template": "customer" }` or `{ "to": "+4479...", "template": "driver" }`
+  - response includes safe diagnostics: `normalizedRecipient`, `templateSidPresent`, `templateSidLooksValid`, `fromLooksValid`, `twilioStatus`, `twilioErrorCode`.
+
+Email diagnostics:
+- Admin health includes:
+  - `emailProvider`
+  - `resendApiKeyPresent`
+  - `emailFromPresent`
+  - `adminEmailPresent`
+  - `emailConfigured`
+- Admin-only test endpoint:
+  - `POST /api/admin/notifications/email-test`
+  - body: `{ "to": "test@example.com", "type": "simple" }`
+  - `type` supports: `simple`, `customer-driver`, `driver-job`
+- Assignment communication records now persist provider evidence (`providerMessageId`, recipients, statuses, and safe error codes).
 
 Driver photo upload troubleshooting:
 1. Confirm Amplify env var: `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos`

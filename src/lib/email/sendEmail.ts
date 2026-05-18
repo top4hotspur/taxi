@@ -11,6 +11,9 @@ export interface EmailResult {
   ok: boolean;
   skipped: boolean;
   provider?: string;
+  providerMessageId?: string | null;
+  providerStatus?: string | null;
+  errorCode?: "EMAIL_NOT_CONFIGURED" | "EMAIL_RECIPIENT_MISSING" | "EMAIL_SEND_FAILED";
   error?: string;
 }
 
@@ -36,28 +39,80 @@ function warnStructured(reason: string, meta?: Record<string, unknown>) {
 
 export async function sendEmail(input: SendEmailInput): Promise<EmailResult> {
   const { provider, apiKey, from } = envConfig();
+  const recipient = String(input.to || "").trim();
+
+  if (!recipient) {
+    return {
+      ok: false,
+      skipped: true,
+      provider: provider || "resend",
+      errorCode: "EMAIL_RECIPIENT_MISSING",
+      error: "Recipient email is missing",
+      providerMessageId: null,
+      providerStatus: "skipped",
+    };
+  }
 
   if (provider !== "resend" || !apiKey || !from) {
     warnStructured("email_provider_not_configured", {
       provider,
       hasApiKey: Boolean(apiKey),
       hasFrom: Boolean(from),
-      to: input.to,
+      to: recipient,
       subject: input.subject,
     });
-    return { ok: false, skipped: true, error: "Email provider not configured" };
+    return {
+      ok: false,
+      skipped: true,
+      provider: "resend",
+      errorCode: "EMAIL_NOT_CONFIGURED",
+      error: "Email provider not configured",
+      providerMessageId: null,
+      providerStatus: "skipped",
+    };
   }
 
   try {
     const resend = new Resend(apiKey);
-    await resend.emails.send({ from, to: input.to, subject: input.subject, text: input.text, html: input.html });
-    return { ok: true, skipped: false, provider: "resend" };
+    const response = await resend.emails.send({ from, to: recipient, subject: input.subject, text: input.text, html: input.html });
+    const providerMessageId = response?.data?.id || null;
+    if (response?.error) {
+      warnStructured("email_send_failed", {
+        to: recipient,
+        subject: input.subject,
+        error: response.error.message || "Unknown provider error",
+      });
+      return {
+        ok: false,
+        skipped: false,
+        provider: "resend",
+        errorCode: "EMAIL_SEND_FAILED",
+        error: response.error.message || "Email send failed",
+        providerMessageId,
+        providerStatus: "failed",
+      };
+    }
+    return {
+      ok: true,
+      skipped: false,
+      provider: "resend",
+      providerMessageId,
+      providerStatus: "accepted",
+    };
   } catch (error) {
     warnStructured("email_send_failed", {
-      to: input.to,
+      to: recipient,
       subject: input.subject,
       error: error instanceof Error ? error.message : "Unknown error",
     });
-    return { ok: false, skipped: false, provider: "resend", error: error instanceof Error ? error.message : "Unknown error" };
+    return {
+      ok: false,
+      skipped: false,
+      provider: "resend",
+      errorCode: "EMAIL_SEND_FAILED",
+      error: error instanceof Error ? error.message : "Unknown error",
+      providerMessageId: null,
+      providerStatus: "failed",
+    };
   }
 }

@@ -47,12 +47,15 @@ export async function GET() {
       }
     })
   );
-  const emailEnvConfigured = Boolean(
-    process.env.EMAIL_PROVIDER?.trim() &&
-      process.env.RESEND_API_KEY?.trim() &&
-      process.env.EMAIL_FROM?.trim() &&
-      process.env.ADMIN_EMAIL?.trim()
-  );
+  const emailProvider = process.env.EMAIL_PROVIDER?.trim() || "";
+  const resendApiKeyPresent = Boolean(process.env.RESEND_API_KEY?.trim());
+  const emailFromPresent = Boolean(process.env.EMAIL_FROM?.trim());
+  const adminEmailPresent = Boolean(process.env.ADMIN_EMAIL?.trim());
+  const emailConfigured = Boolean(emailProvider && resendApiKeyPresent && emailFromPresent && adminEmailPresent);
+  const emailGuidance =
+    emailProvider === "resend"
+      ? "Check Resend domain/sender verification and spam folder."
+      : "Email provider not configured.";
   const squareEnvironment = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() || "missing";
   const squareAccessTokenPresent = Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim());
   const squareLocationIdPresent = Boolean(process.env.SQUARE_LOCATION_ID?.trim());
@@ -100,7 +103,6 @@ export async function GET() {
     effectiveRegionPresent: Boolean(process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim()),
     appAwsAccessKeyIdPresent: Boolean(process.env.APP_AWS_ACCESS_KEY_ID?.trim()),
     appAwsSecretAccessKeyPresent: Boolean(process.env.APP_AWS_SECRET_ACCESS_KEY?.trim()),
-    adminEmailPresent: Boolean(process.env.ADMIN_EMAIL?.trim()),
     ddbTables,
     ddbTableChecks,
     analyticsTableEnvPresent: Boolean(process.env.DDB_TABLE_ANALYTICS_EVENTS?.trim()),
@@ -116,7 +118,12 @@ export async function GET() {
       timeUplifts: Boolean(process.env.DDB_TABLE_PRICING_TIME_UPLIFTS?.trim()),
       dateUplifts: Boolean(process.env.DDB_TABLE_PRICING_DATE_UPLIFTS?.trim()),
     },
-    emailEnvConfigured,
+    emailProvider,
+    resendApiKeyPresent,
+    emailFromPresent,
+    adminEmailPresent,
+    emailConfigured,
+    emailGuidance,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),
     googleRoutesApiKeyPresent: Boolean(process.env.GOOGLE_ROUTES_API_KEY?.trim()),
     squareAccessTokenPresent,

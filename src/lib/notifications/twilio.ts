@@ -3,10 +3,13 @@ export type TwilioChannelResult = {
   skipped?: boolean;
   reason?: string;
   providerMessageId?: string;
+  safeMessage?: string;
   error?: string;
   errorCode?: string;
   twilioStatus?: number | null;
   twilioErrorCode?: string | null;
+  twilioDeliveryStatus?: string | null;
+  normalizedRecipient?: string;
 };
 
 export type SendPhoneMessageInput = {
@@ -56,15 +59,33 @@ function smsConfigured() {
 function mapTwilioError(result: TwilioChannelResult): TwilioChannelResult {
   const text = `${result.error || ""} ${result.errorCode || ""}`.toLowerCase();
   if (text.includes("authenticate") || text.includes("auth")) {
-    return { ...result, reason: "TWILIO_AUTH_FAILED" };
+    return { ...result, reason: "TWILIO_AUTH_FAILED", safeMessage: "Twilio authentication failed." };
   }
   if (text.includes("template") || text.includes("contentsid")) {
-    return { ...result, reason: "WHATSAPP_TEMPLATE_REJECTED_OR_NOT_APPROVED" };
+    return {
+      ...result,
+      reason: "WHATSAPP_TEMPLATE_REJECTED_OR_NOT_APPROVED",
+      safeMessage: "WhatsApp template is rejected, not approved, or not eligible for this channel.",
+    };
+  }
+  if (text.includes("outside of the allowed window") || text.includes("window")) {
+    return {
+      ...result,
+      reason: "WHATSAPP_RECIPIENT_NOT_OPTED_IN_OR_WINDOW_CLOSED",
+      safeMessage: "Recipient is outside the allowed WhatsApp messaging window or not opted in.",
+    };
+  }
+  if (text.includes("business-initiated") || text.includes("unapproved")) {
+    return {
+      ...result,
+      reason: "WHATSAPP_BUSINESS_INITIATED_NOT_APPROVED",
+      safeMessage: "Business-initiated WhatsApp messaging is not approved for this sender/template.",
+    };
   }
   if (text.includes("to") || text.includes("recipient") || text.includes("phone") || text.includes("whatsapp")) {
-    return { ...result, reason: "WHATSAPP_RECIPIENT_INVALID" };
+    return { ...result, reason: "WHATSAPP_RECIPIENT_INVALID", safeMessage: "Recipient phone number is invalid for WhatsApp." };
   }
-  return { ...result, reason: "TWILIO_SEND_FAILED" };
+  return { ...result, reason: "TWILIO_SEND_FAILED", safeMessage: "Twilio could not send this WhatsApp message." };
 }
 
 async function sendTwilioMessage(params: {
@@ -100,7 +121,7 @@ async function sendTwilioMessage(params: {
   });
 
   const payload = await response.json().catch(() => null) as
-    | { sid?: string; message?: string; code?: number }
+    | { sid?: string; message?: string; code?: number; status?: string }
     | null;
 
   if (!response.ok) {
@@ -112,6 +133,7 @@ async function sendTwilioMessage(params: {
       errorCode,
       twilioStatus: response.status,
       twilioErrorCode: errorCode || null,
+      twilioDeliveryStatus: payload?.status || null,
     } as TwilioChannelResult;
   }
 
@@ -119,25 +141,26 @@ async function sendTwilioMessage(params: {
     ok: true,
     providerMessageId: payload?.sid,
     twilioStatus: response.status,
+    twilioDeliveryStatus: payload?.status || null,
   } as TwilioChannelResult;
 }
 
 export async function sendWhatsApp(input: SendPhoneMessageInput): Promise<TwilioChannelResult> {
   const normalized = normalizePhone(input.to);
   if (!normalized) {
-    return { ok: false, skipped: true, reason: "WHATSAPP_RECIPIENT_INVALID" };
+    return { ok: false, skipped: true, reason: "WHATSAPP_RECIPIENT_INVALID", normalizedRecipient: "" };
   }
   if (!whatsappEnabled()) {
-    return { ok: false, skipped: true, reason: "WHATSAPP_DISABLED" };
+    return { ok: false, skipped: true, reason: "WHATSAPP_DISABLED", normalizedRecipient: normalized };
   }
   if (!twilioBaseConfigured() || !whatsappFromConfigured()) {
-    return { ok: false, skipped: true, reason: "WHATSAPP_NOT_CONFIGURED" };
+    return { ok: false, skipped: true, reason: "WHATSAPP_NOT_CONFIGURED", normalizedRecipient: normalized };
   }
   if (!input.contentSid) {
-    return { ok: false, skipped: true, reason: "WHATSAPP_TEMPLATE_NOT_CONFIGURED" };
+    return { ok: false, skipped: true, reason: "WHATSAPP_TEMPLATE_NOT_CONFIGURED", normalizedRecipient: normalized };
   }
   if (!input.body && (!input.contentVariables || Object.keys(input.contentVariables).length === 0)) {
-    return { ok: false, skipped: true, reason: "WHATSAPP_INPUT_INVALID" };
+    return { ok: false, skipped: true, reason: "WHATSAPP_INPUT_INVALID", normalizedRecipient: normalized };
   }
 
   const from = process.env.TWILIO_WHATSAPP_FROM!.trim();
@@ -150,8 +173,8 @@ export async function sendWhatsApp(input: SendPhoneMessageInput): Promise<Twilio
     contentVariables: input.contentVariables,
   });
 
-  if (!result.ok) return mapTwilioError(result);
-  return result;
+  if (!result.ok) return { ...mapTwilioError(result), normalizedRecipient: normalized };
+  return { ...result, normalizedRecipient: normalized };
 }
 
 export async function sendSms(input: SendPhoneMessageInput): Promise<TwilioChannelResult> {

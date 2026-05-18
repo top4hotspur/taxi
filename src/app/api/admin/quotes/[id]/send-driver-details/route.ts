@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email/sendEmail";
@@ -7,16 +8,23 @@ import { formatUkDateTimeFromParts } from "@/lib/formatting";
 import { sendSms, sendWhatsApp } from "@/lib/notifications/twilio";
 
 type ChannelResult = "sent" | "skipped" | "failed";
+type WhatsAppUiResult = "queued" | "sent" | "delivered" | "skipped" | "failed";
 
 type NotificationSummary = {
   customerEmail: ChannelResult;
-  customerWhatsApp: ChannelResult;
+  customerWhatsApp: WhatsAppUiResult;
   customerSms: ChannelResult;
   customerSmsAttempted: boolean;
   driverEmail: ChannelResult;
-  driverWhatsApp: ChannelResult;
+  driverWhatsApp: WhatsAppUiResult;
   driverSms: ChannelResult;
   driverSmsAttempted: boolean;
+  customerEmailMessageId?: string | null;
+  driverEmailMessageId?: string | null;
+  customerWhatsAppMessageSid?: string | null;
+  driverWhatsAppMessageSid?: string | null;
+  customerWhatsAppTwilioStatus?: string | null;
+  driverWhatsAppTwilioStatus?: string | null;
   detailMessages: string[];
 };
 
@@ -57,6 +65,13 @@ function formatJourneyDateTime(quote: NonNullable<Awaited<ReturnType<typeof db.f
   return formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime);
 }
 
+function mapTwilioDeliveryToUi(status?: string | null): "queued" | "sent" | "delivered" {
+  const value = String(status || "").toLowerCase();
+  if (value.includes("deliver")) return "delivered";
+  if (value.includes("sent")) return "sent";
+  return "queued";
+}
+
 function customerPhoneCandidates(params: {
   quote: NonNullable<Awaited<ReturnType<typeof db.findQuoteById>>>;
   profilePhone?: string;
@@ -80,6 +95,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   if (!isAdminUser(user)) return NextResponse.json({ success: false, message: "Forbidden" }, { status: 403 });
 
   const { id } = await context.params;
+  const correlationId = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const quote = await db.findQuoteById(id);
   if (!quote) return NextResponse.json({ success: false, message: "Quote not found." }, { status: 404 });
   if (quote.paymentStatus !== "PAID") {
@@ -121,28 +137,51 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   let driverJobSmsSentAt: string | undefined;
   let customerWhatsAppSentAt: string | undefined;
   let driverWhatsAppSentAt: string | undefined;
-  let customerWhatsAppStatus: "SENT" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED" = "SKIPPED";
-  let driverWhatsAppStatus: "SENT" | "SKIPPED" | "SKIPPED_NO_DRIVER_PHONE" | "FAILED" = "SKIPPED";
+  let customerDriverEmailStatus: "SENT" | "SKIPPED" | "FAILED" = "SKIPPED";
+  let driverJobEmailStatus: "SENT" | "SKIPPED" | "FAILED" = "SKIPPED";
+  let customerWhatsAppStatus: "SENT" | "QUEUED" | "DELIVERED" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED" = "SKIPPED";
+  let driverWhatsAppStatus: "SENT" | "QUEUED" | "DELIVERED" | "SKIPPED" | "SKIPPED_NO_DRIVER_PHONE" | "FAILED" = "SKIPPED";
   let customerWhatsAppError: string | undefined;
   let driverWhatsAppError: string | undefined;
+  let customerDriverEmailProviderMessageId: string | undefined;
+  let driverJobEmailProviderMessageId: string | undefined;
+  let customerDriverEmailErrorCode: string | undefined;
+  let driverJobEmailErrorCode: string | undefined;
+  let customerWhatsAppMessageSid: string | undefined;
+  let driverWhatsAppMessageSid: string | undefined;
+  let customerWhatsAppTwilioStatus: string | undefined;
+  let driverWhatsAppTwilioStatus: string | undefined;
+  let customerWhatsAppTwilioErrorCode: string | undefined;
+  let driverWhatsAppTwilioErrorCode: string | undefined;
+  let customerWhatsAppNormalizedRecipient: string | undefined;
+  let driverWhatsAppNormalizedRecipient: string | undefined;
 
   if (customerEmailTo) {
     try {
       const emailPayload = customerDriverDetailsEmail(quote, quote.guestName || quote.passengerName);
       const result = await sendEmail({ to: customerEmailTo, subject: emailPayload.subject, text: emailPayload.text });
+      customerDriverEmailProviderMessageId = result.providerMessageId || undefined;
       if (result.ok) {
         summary.customerEmail = "sent";
+        customerDriverEmailStatus = "SENT";
         customerDriverEmailSentAt = nowIso;
+        summary.customerEmailMessageId = result.providerMessageId || null;
       } else {
-        summary.customerEmail = "failed";
-        summary.detailMessages.push(`Customer email failed: ${result.error || "Unknown error"}`);
+        summary.customerEmail = result.skipped ? "skipped" : "failed";
+        customerDriverEmailStatus = result.skipped ? "SKIPPED" : "FAILED";
+        customerDriverEmailErrorCode = result.errorCode || undefined;
+        summary.detailMessages.push(`Customer email ${result.skipped ? "skipped" : "failed"}: ${result.errorCode || result.error || "Unknown error"}`);
       }
     } catch (error) {
       summary.customerEmail = "failed";
+      customerDriverEmailStatus = "FAILED";
+      customerDriverEmailErrorCode = "EMAIL_SEND_FAILED";
       summary.detailMessages.push(`Customer email failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   } else {
     summary.customerEmail = "skipped";
+    customerDriverEmailStatus = "SKIPPED";
+    customerDriverEmailErrorCode = "EMAIL_RECIPIENT_MISSING";
     summary.detailMessages.push("Customer email skipped: no customer email available.");
   }
 
@@ -167,19 +206,30 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     });
 
     if (wa.ok) {
-      summary.customerWhatsApp = "sent";
-      customerWhatsAppStatus = "SENT";
+      const waUi = mapTwilioDeliveryToUi(wa.twilioDeliveryStatus);
+      summary.customerWhatsApp = waUi;
+      customerWhatsAppStatus = waUi === "delivered" ? "DELIVERED" : waUi === "sent" ? "SENT" : "QUEUED";
       customerWhatsAppSentAt = nowIso;
+      customerWhatsAppMessageSid = wa.providerMessageId || undefined;
+      customerWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      customerWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       customerWhatsAppError = undefined;
+      summary.customerWhatsAppMessageSid = wa.providerMessageId || null;
+      summary.customerWhatsAppTwilioStatus = wa.twilioDeliveryStatus || null;
     } else if (wa.skipped) {
       summary.customerWhatsApp = "skipped";
       customerWhatsAppStatus = "SKIPPED";
       customerWhatsAppError = statusFromReason(wa.reason);
+      customerWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       summary.detailMessages.push(`Customer WhatsApp skipped: ${mapSkippedReason(wa.reason)}`);
     } else {
       summary.customerWhatsApp = "failed";
       customerWhatsAppStatus = "FAILED";
       customerWhatsAppError = statusFromReason(wa.reason);
+      customerWhatsAppTwilioErrorCode = wa.twilioErrorCode || wa.errorCode || undefined;
+      customerWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      customerWhatsAppMessageSid = wa.providerMessageId || undefined;
+      customerWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       summary.detailMessages.push(`Customer WhatsApp failed: ${customerWhatsAppError}`);
 
       if (process.env.TWILIO_FROM_NUMBER?.trim()) {
@@ -208,17 +258,27 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       const result = await sendEmail({ to: driverEmailTo, subject: emailPayload.subject, text: emailPayload.text });
       if (result.ok) {
         summary.driverEmail = "sent";
+        driverJobEmailStatus = "SENT";
         driverJobEmailSentAt = nowIso;
+        driverJobEmailProviderMessageId = result.providerMessageId || undefined;
+        summary.driverEmailMessageId = result.providerMessageId || null;
       } else {
-        summary.driverEmail = "failed";
-        summary.detailMessages.push(`Driver email failed: ${result.error || "Unknown error"}`);
+        summary.driverEmail = result.skipped ? "skipped" : "failed";
+        driverJobEmailStatus = result.skipped ? "SKIPPED" : "FAILED";
+        driverJobEmailProviderMessageId = result.providerMessageId || undefined;
+        driverJobEmailErrorCode = result.errorCode || undefined;
+        summary.detailMessages.push(`Driver email ${result.skipped ? "skipped" : "failed"}: ${result.errorCode || result.error || "Unknown error"}`);
       }
     } catch (error) {
       summary.driverEmail = "failed";
+      driverJobEmailStatus = "FAILED";
+      driverJobEmailErrorCode = "EMAIL_SEND_FAILED";
       summary.detailMessages.push(`Driver email failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   } else {
     summary.driverEmail = "skipped";
+    driverJobEmailStatus = "SKIPPED";
+    driverJobEmailErrorCode = "EMAIL_RECIPIENT_MISSING";
     summary.detailMessages.push("Driver email skipped: no driver email available.");
   }
 
@@ -242,19 +302,30 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     });
 
     if (wa.ok) {
-      summary.driverWhatsApp = "sent";
-      driverWhatsAppStatus = "SENT";
+      const waUi = mapTwilioDeliveryToUi(wa.twilioDeliveryStatus);
+      summary.driverWhatsApp = waUi;
+      driverWhatsAppStatus = waUi === "delivered" ? "DELIVERED" : waUi === "sent" ? "SENT" : "QUEUED";
       driverWhatsAppSentAt = nowIso;
+      driverWhatsAppMessageSid = wa.providerMessageId || undefined;
+      driverWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      driverWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       driverWhatsAppError = undefined;
+      summary.driverWhatsAppMessageSid = wa.providerMessageId || null;
+      summary.driverWhatsAppTwilioStatus = wa.twilioDeliveryStatus || null;
     } else if (wa.skipped) {
       summary.driverWhatsApp = "skipped";
       driverWhatsAppStatus = "SKIPPED";
       driverWhatsAppError = statusFromReason(wa.reason);
+      driverWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       summary.detailMessages.push(`Driver WhatsApp skipped: ${mapSkippedReason(wa.reason)}`);
     } else {
       summary.driverWhatsApp = "failed";
       driverWhatsAppStatus = "FAILED";
       driverWhatsAppError = statusFromReason(wa.reason);
+      driverWhatsAppTwilioErrorCode = wa.twilioErrorCode || wa.errorCode || undefined;
+      driverWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      driverWhatsAppMessageSid = wa.providerMessageId || undefined;
+      driverWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       summary.detailMessages.push(`Driver WhatsApp failed: ${driverWhatsAppError}`);
 
       if (process.env.TWILIO_FROM_NUMBER?.trim()) {
@@ -293,15 +364,47 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     driverDetailsSentAt: summary.customerEmail === "sent" ? nowIso : undefined,
     driverJobSentAt: summary.driverEmail === "sent" ? nowIso : undefined,
     customerDriverEmailSentAt,
+    customerDriverEmailAttemptedAt: nowIso,
+    customerDriverEmailStatus,
+    customerDriverEmailProvider: "RESEND",
+    customerDriverEmailProviderMessageId,
+    customerDriverEmailRecipient: customerEmailTo || undefined,
+    customerDriverEmailSubject: customerDriverDetailsEmail(quote, quote.guestName || quote.passengerName).subject,
+    customerDriverEmailError: summary.customerEmail === "failed" ? summary.detailMessages.find((m) => m.toLowerCase().startsWith("customer email")) : undefined,
+    customerDriverEmailErrorCode,
     customerDriverSmsSentAt: customerDriverSmsSentAt || undefined,
     driverJobEmailSentAt,
+    driverJobEmailAttemptedAt: nowIso,
+    driverJobEmailStatus,
+    driverJobEmailProvider: "RESEND",
+    driverJobEmailProviderMessageId,
+    driverJobEmailRecipient: driverEmailTo || undefined,
+    driverJobEmailSubject: driverJobDetailsEmail(quote).subject,
+    driverJobEmailError: summary.driverEmail === "failed" ? summary.detailMessages.find((m) => m.toLowerCase().startsWith("driver email")) : undefined,
+    driverJobEmailErrorCode,
     driverJobSmsSentAt: driverJobSmsSentAt || undefined,
     customerWhatsAppSentAt: customerWhatsAppSentAt || undefined,
+    customerWhatsAppAttemptedAt: nowIso,
     driverWhatsAppSentAt: driverWhatsAppSentAt || undefined,
+    driverWhatsAppAttemptedAt: nowIso,
     customerWhatsAppStatus,
     driverWhatsAppStatus,
     customerWhatsAppError,
     driverWhatsAppError,
+    customerWhatsAppMessageSid,
+    driverWhatsAppMessageSid,
+    customerWhatsAppTwilioStatus,
+    driverWhatsAppTwilioStatus,
+    customerWhatsAppTwilioErrorCode,
+    driverWhatsAppTwilioErrorCode,
+    customerWhatsAppRecipient: customerPhoneTo || undefined,
+    driverWhatsAppRecipient: driverPhoneTo || undefined,
+    customerWhatsAppNormalizedRecipient,
+    driverWhatsAppNormalizedRecipient,
+    customerWhatsAppTemplateSid: customerTemplateSid || undefined,
+    driverWhatsAppTemplateSid: driverTemplateSid || undefined,
+    customerWhatsAppContentVariableKeys: ["1", "2", "3", "4", "5", "6"],
+    driverWhatsAppContentVariableKeys: ["1", "2", "3", "4", "5"],
     lastCommunicationError: summary.detailMessages.length ? summary.detailMessages.join(" | ").slice(0, 1000) : undefined,
   });
 
@@ -310,6 +413,21 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     : assignmentStatus === "PARTIALLY_SENT"
       ? "Partially sent. Required emails delivered, but some channels had issues."
       : "Required emails failed. Please review below.";
+
+  console.info(
+    JSON.stringify({
+      source: "admin.send-driver-details",
+      correlationId,
+      quoteId: id,
+      customerEmailTo: customerEmailTo || null,
+      driverEmailTo: driverEmailTo || null,
+      customerWhatsAppStatus,
+      driverWhatsAppStatus,
+      customerWhatsAppMessageSid: customerWhatsAppMessageSid || null,
+      driverWhatsAppMessageSid: driverWhatsAppMessageSid || null,
+      assignmentStatus,
+    })
+  );
 
   return NextResponse.json({
     success: true,
