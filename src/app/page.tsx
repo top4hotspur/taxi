@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import CTASection from "@/components/CTASection";
 import Hero from "@/components/Hero";
 import ServiceCard from "@/components/ServiceCard";
-import { featuredServices, popularRoutes, trustPoints } from "@/lib/siteContent";
+import { featuredServices, popularRoutes } from "@/lib/siteContent";
 
 export const metadata: Metadata = {
   title: "Private Taxi & Tour Transfers Across Northern Ireland",
@@ -22,22 +22,6 @@ export default function Home() {
         primaryCta={{ label: "Request a Quote", href: "/quote" }}
         secondaryCta={{ label: "Airport Transfers", href: "/airport-transfers" }}
       />
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {trustPoints.map((point) => (
-            <p key={point} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-              {point}
-            </p>
-          ))}
-        </div>
-        <div className="mt-4 space-y-1">
-          <p className="text-sm font-medium text-slate-700">Secure card payments processed by Square.</p>
-          <p className="text-xs text-slate-500">We accept major debit and credit cards, including Visa, Mastercard and American Express.</p>
-          <p className="text-xs text-slate-600">NI Taxi Co • Service area: Northern Ireland • Private hire / pre-booked taxi and transfer services.</p>
-          <p className="text-xs text-slate-600">Contact: contact@nitaxico.com • 07440368474</p>
-        </div>
-      </section>
 
       <section>
         <h2 className="text-3xl font-bold text-slate-900">Featured Services</h2>

@@ -29,10 +29,22 @@ export const trustPoints = [
 
 export const featuredServices = [
   {
+    title: "Local Taxi & Private Hire",
+    description:
+      "Reliable pre-booked transport for nights out, appointments, station transfers, and local journeys across Northern Ireland.",
+    href: "/services",
+  },
+  {
     title: "Airport Transfers",
     description:
       "Pre-booked private transfers to and from Belfast International, Belfast City, and Dublin Airport with professional meet-and-greet options.",
     href: "/airport-transfers",
+  },
+  {
+    title: "Corporate & Tour Operator Bookings",
+    description:
+      "A professional partner for structured itineraries, recurring movements, and group logistics.",
+    href: "/services",
   },
   {
     title: "Golf Transfers",
@@ -50,18 +62,6 @@ export const featuredServices = [
     title: "Event Transport",
     description:
       "Coordinated transfers for weddings, conferences, and large events requiring timed arrivals and reliable communication.",
-    href: "/services",
-  },
-  {
-    title: "Corporate & Tour Operator Bookings",
-    description:
-      "A professional partner for structured itineraries, recurring movements, and group logistics.",
-    href: "/services",
-  },
-  {
-    title: "Local Taxi & Private Hire",
-    description:
-      "Reliable pre-booked transport for nights out, appointments, station transfers, and local journeys across Northern Ireland.",
     href: "/services",
   },
 ];
