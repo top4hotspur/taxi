@@ -9,6 +9,8 @@ function quoteSummary(quote: QuoteRecord) {
     `Service: ${quote.serviceType}`,
     `Route: ${quote.pickupLocation} -> ${quote.dropoffLocation}`,
     `Date/Time: ${quote.pickupDate} ${quote.pickupTime}`,
+    `Outward flight number: ${quote.outwardFlightNumber || "N/A"}`,
+    `Return flight number: ${quote.returnFlightNumber || "N/A"}`,
     `Passengers: ${quote.passengers}`,
     `Luggage: ${quote.luggage || "N/A"}`,
     `Golf bags: ${quote.golfBags ?? 0}`,
@@ -165,11 +167,11 @@ export function driverJobDetailsEmail(quote: QuoteRecord) {
     (quote.oversizeItemCount ?? quote.golfBags ?? 0) > 0 ? `Oversize items: ${quote.oversizeItemCount ?? quote.golfBags}` : null,
   ].filter(Boolean).join(", ") || "No luggage declared";
   const returnLine = quote.returnJourney || quote.returnJourneyNeeded
-    ? `Return journey:\nPickup: ${quote.returnPickup || "Not provided"}\nDrop-off: ${quote.returnDropoff || "Not provided"}\nDate/time: ${quote.returnDate || "Not provided"} ${quote.returnTime || ""}`
+    ? `Return journey:\nPickup: ${quote.returnPickup || "Not provided"}\nDrop-off: ${quote.returnDropoff || "Not provided"}\nDate/time: ${quote.returnDate || "Not provided"} ${quote.returnTime || ""}\nReturn flight number: ${quote.returnFlightNumber || "Not provided"}`
     : "Return journey: No";
   return {
     subject: "NI Taxi Co job details",
-    text: `Job details:\n\nPickup date/time: ${quote.pickupDate} ${quote.pickupTime}\nPickup: ${quote.pickupLocation}\nDrop-off: ${quote.dropoffLocation}\n${returnLine}\n\nCustomer/booker: ${customerName}\nCustomer phone: ${customerPhone}\n${leadPassengerLine}\nPassengers: ${quote.passengers}\nLuggage: ${luggage}\nSpecial requests: ${quote.itineraryMessage || "Not provided"}\nAdmin notes: ${quote.adminNotes || "Not provided"}\n\n${emailFooter()}`,
+    text: `Job details:\n\nPickup date/time: ${quote.pickupDate} ${quote.pickupTime}\nPickup: ${quote.pickupLocation}\nDrop-off: ${quote.dropoffLocation}\nOutward flight number: ${quote.outwardFlightNumber || "Not provided"}\n${returnLine}\n\nCustomer/booker: ${customerName}\nCustomer phone: ${customerPhone}\n${leadPassengerLine}\nPassengers: ${quote.passengers}\nLuggage: ${luggage}\nSpecial requests: ${quote.itineraryMessage || "Not provided"}\nAdmin notes: ${quote.adminNotes || "Not provided"}\n\n${emailFooter()}`,
   };
 }
 

@@ -25,7 +25,6 @@ export const trustPoints = [
   "Tourist day tours",
   "Pre-booked private hire",
   "Tour operator friendly",
-  "Registered Company Number: NI721173",
 ];
 
 export const featuredServices = [
@@ -59,15 +58,23 @@ export const featuredServices = [
       "A professional partner for structured itineraries, recurring movements, and group logistics.",
     href: "/services",
   },
+  {
+    title: "Local Taxi & Private Hire",
+    description:
+      "Reliable pre-booked transport for nights out, appointments, station transfers, and local journeys across Northern Ireland.",
+    href: "/services",
+  },
 ];
 
 export const popularRoutes = [
-  "Belfast International Airport to Belfast",
-  "Belfast City Airport to Belfast",
-  "Dublin Airport to Belfast",
-  "Belfast to Giant's Causeway",
-  "Belfast to Royal Portrush",
-  "Belfast to Newcastle / Royal County Down",
+  "Belfast International Airport",
+  "Belfast City Airport",
+  "Dublin Airport",
+  "Giant's Causeway",
+  "Royal Portrush",
+  "Bushmills Distillery",
+  "Popular golf clubs across the Republic of Ireland",
+  "Guinness Storehouse",
 ];
 
 export const serviceDetails = [

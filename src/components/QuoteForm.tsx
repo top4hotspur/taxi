@@ -37,6 +37,10 @@ type EstimateResponse = {
   manualGroupQuote?: boolean;
 };
 
+function isAirportLocation(value: string) {
+  return value.toLowerCase().includes("airport");
+}
+
 export default function QuoteForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -242,6 +246,8 @@ export default function QuoteForm() {
       pricingCalculatedAt: estimate ? new Date().toISOString() : "",
       routeEstimateFailed: Boolean(estimate?.routeEstimateFailed || estimateStale),
       routeEstimateFailureReason: String(estimateStale ? "Journey details changed after estimate." : estimate?.routeEstimateFailureReason || ""),
+      outwardFlightNumber: outwardAirportPickup ? String(fd.get("outwardFlightNumber") || "") : "",
+      returnFlightNumber: returnAirportPickup ? String(fd.get("returnFlightNumber") || "") : "",
       termsAccepted: String(fd.get("termsAccepted") || "").toLowerCase() === "true",
       policyVersion: "v1-2026-05",
     };
@@ -261,6 +267,8 @@ export default function QuoteForm() {
   const showNameField = !customerContext.loggedInCustomer || !customerContext.name;
   const showEmailField = !customerContext.loggedInCustomer || !customerContext.email;
   const showPhoneField = !customerContext.loggedInCustomer || !customerContext.phone;
+  const outwardAirportPickup = isAirportLocation(formState.pickupLocation || "");
+  const returnAirportPickup = returnJourneyNeeded && isAirportLocation(formState.returnPickupLocation || "");
 
   return (
     <form
@@ -274,6 +282,14 @@ export default function QuoteForm() {
         if (target.name) {
           markPotentiallyStale(target.name);
           setFormState((current) => ({ ...current, [target.name]: target.value }));
+          if (target.name === "pickupLocation" && !isAirportLocation(target.value)) {
+            setFieldValue("outwardFlightNumber", "");
+            setFormState((current) => ({ ...current, outwardFlightNumber: "" }));
+          }
+          if (target.name === "returnPickupLocation" && !isAirportLocation(target.value)) {
+            setFieldValue("returnFlightNumber", "");
+            setFormState((current) => ({ ...current, returnFlightNumber: "" }));
+          }
         }
       }}
       className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
@@ -301,6 +317,12 @@ export default function QuoteForm() {
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <PlaceAutocompleteInput label="Outward pickup location" required locationNameField="pickupLocation" placeIdField="pickupPlaceId" addressField="pickupAddress" latField="pickupLat" lngField="pickupLng" />
+            {outwardAirportPickup ? (
+              <div className="space-y-1">
+                <InputField label="Flight number" name="outwardFlightNumber" placeholder="e.g. EI123, BA1416" />
+                <p className="text-xs text-slate-500">This helps us monitor arrivals and plan pickup timing.</p>
+              </div>
+            ) : null}
             <div className="space-y-1">
               <p className="text-xs text-slate-500">Quick select:</p>
               <div className="flex flex-wrap gap-2">
@@ -371,6 +393,7 @@ export default function QuoteForm() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <PlaceAutocompleteInput label="Return pickup location" required locationNameField="returnPickupLocation" placeIdField="returnPickupPlaceId" addressField="returnPickupAddress" latField="returnPickupLat" lngField="returnPickupLng" defaultValueFieldName="dropoffLocation" />
+              {returnAirportPickup ? <InputField label="Return flight number" name="returnFlightNumber" placeholder="e.g. EI123, BA1416" /> : null}
               <div className="space-y-1">
                 <p className="text-xs text-slate-500">Quick select:</p>
                 <div className="flex flex-wrap gap-2">
@@ -511,11 +534,11 @@ export default function QuoteForm() {
   );
 }
 
-function InputField({ label, name, type = "text", required, min }: { label: string; name: string; type?: string; required?: boolean; min?: number }) {
+function InputField({ label, name, type = "text", required, min, placeholder }: { label: string; name: string; type?: string; required?: boolean; min?: number; placeholder?: string }) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor={name}>{label}</label>
-      <input id={name} name={name} type={type} min={min} required={required} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2" />
+      <input id={name} name={name} type={type} min={min} placeholder={placeholder} required={required} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2" />
     </div>
   );
 }

@@ -96,6 +96,7 @@ type Quote = {
   dropoffAddress?: string;
   pickupDate: string;
   pickupTime: string;
+  outwardFlightNumber?: string;
   passengers: number;
   handLuggageCount?: number;
   suitcaseCount?: number;
@@ -108,6 +109,7 @@ type Quote = {
   returnDropoff?: string;
   returnDate?: string;
   returnTime?: string;
+  returnFlightNumber?: string;
   itineraryMessage?: string;
   estimatedFare?: number;
   finalEstimatedFare?: number;
@@ -450,12 +452,14 @@ export default function AdminQuoteDetailPage() {
           {fieldRow("Outward pickup", quote.pickupLocation || quote.pickupAddress || "Not provided")}
           {fieldRow("Outward drop-off", quote.dropoffLocation || quote.dropoffAddress || "Not provided")}
           {fieldRow("Outward date/time", formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime))}
+          {quote.outwardFlightNumber ? fieldRow("Outward flight number", quote.outwardFlightNumber) : null}
           {fieldRow("Return journey", showReturn ? "Yes" : "No")}
           {showReturn ? (
             <>
               {fieldRow("Return pickup", quote.returnPickup?.trim() || "Not provided")}
               {fieldRow("Return drop-off", quote.returnDropoff?.trim() || "Not provided")}
               {fieldRow("Return date/time", formatUkDateTimeFromParts(quote.returnDate, quote.returnTime))}
+              {quote.returnFlightNumber ? fieldRow("Return flight number", quote.returnFlightNumber) : null}
             </>
           ) : null}
           {fieldRow("Passenger count", String(quote.passengers || 0))}

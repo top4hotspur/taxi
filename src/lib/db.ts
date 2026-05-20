@@ -82,6 +82,7 @@ export interface QuoteRecord {
   dropoffLng?: number;
   pickupDate: string;
   pickupTime: string;
+  outwardFlightNumber?: string;
   passengers: number;
   handLuggageCount?: number;
   suitcaseCount?: number;
@@ -102,6 +103,7 @@ export interface QuoteRecord {
   returnDropoffLng?: number;
   returnDate?: string;
   returnTime?: string;
+  returnFlightNumber?: string;
   itineraryMessage?: string;
   adminNotes?: string;
   adminCustomerMessage?: string;

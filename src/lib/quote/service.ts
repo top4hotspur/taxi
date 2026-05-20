@@ -40,6 +40,7 @@ export interface CreateQuoteInput {
   dropoffLng?: number;
   pickupDate: string;
   pickupTime: string;
+  outwardFlightNumber?: string;
   passengers: number;
   handLuggageCount?: number;
   suitcaseCount?: number;
@@ -60,6 +61,7 @@ export interface CreateQuoteInput {
   returnDropoffLng?: number;
   returnDate?: string;
   returnTime?: string;
+  returnFlightNumber?: string;
   itineraryMessage?: string;
   estimatedFare?: number;
   finalEstimatedFare?: number;
@@ -126,6 +128,7 @@ export async function createQuote(input: CreateQuoteInput) {
     dropoffLng: input.dropoffLng,
     pickupDate: input.pickupDate,
     pickupTime: input.pickupTime,
+    outwardFlightNumber: input.outwardFlightNumber,
     passengers: input.passengers,
     handLuggageCount: input.handLuggageCount,
     suitcaseCount: input.suitcaseCount,
@@ -146,6 +149,7 @@ export async function createQuote(input: CreateQuoteInput) {
     returnDropoffLng: input.returnDropoffLng,
     returnDate: input.returnDate,
     returnTime: input.returnTime,
+    returnFlightNumber: input.returnFlightNumber,
     itineraryMessage: input.itineraryMessage,
     estimatedFare: input.estimatedFare,
     finalEstimatedFare: input.finalEstimatedFare,

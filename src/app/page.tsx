@@ -53,7 +53,8 @@ export default function Home() {
           <h2 className="text-3xl font-bold text-slate-900">Why Choose NI Taxi Co</h2>
           <ul className="mt-4 space-y-3 text-slate-700">
             <li>Local Northern Ireland knowledge with practical, route-aware planning.</li>
-            <li>Reliable pre-booked transfers with clear confirmation and communication.</li>
+            <li>Reliable pre-booked transport with clear confirmation and communication.</li>
+            <li>Bookings with NI Taxi Co can be made with confidence. We focus on punctuality, practical route planning, and dependable local service.</li>
             <li>Airport meet-and-greet wording available for inbound visitors.</li>
             <li>Ideal for visitors, golf groups, and operator-managed itineraries.</li>
             <li>Professional communication suitable for US and international partners.</li>
@@ -61,8 +62,8 @@ export default function Home() {
         </article>
 
         <article className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-3xl font-bold text-slate-900">Popular Routes</h2>
-          <ul className="mt-4 space-y-3 text-slate-700">
+          <h2 className="text-3xl font-bold text-slate-900">Popular Destinations</h2>
+          <ul className="mt-4 grid gap-3 text-slate-700 sm:grid-cols-2">
             {popularRoutes.map((route) => (
               <li key={route}>{route}</li>
             ))}

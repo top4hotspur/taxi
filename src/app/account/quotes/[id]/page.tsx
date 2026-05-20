@@ -15,12 +15,14 @@ type Quote = {
   dropoffLocation: string;
   pickupDate: string;
   pickupTime: string;
+  outwardFlightNumber?: string;
   returnJourney?: boolean;
   returnJourneyNeeded?: boolean;
   returnPickup?: string;
   returnDropoff?: string;
   returnDate?: string;
   returnTime?: string;
+  returnFlightNumber?: string;
   passengers: number;
   handLuggageCount?: number;
   suitcaseCount?: number;
@@ -152,10 +154,12 @@ export default function AccountQuoteDetail() {
         <p><strong>Service:</strong> {quote.serviceType}</p>
         <p><strong>Outward:</strong> {quote.pickupLocation} to {quote.dropoffLocation}</p>
         <p><strong>Outward date/time:</strong> {formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime)}</p>
+        {quote.outwardFlightNumber ? <p><strong>Outward flight number:</strong> {quote.outwardFlightNumber}</p> : null}
         {(quote.returnJourney || quote.returnJourneyNeeded) ? (
           <>
             <p><strong>Return:</strong> {quote.returnPickup || "Not provided"} to {quote.returnDropoff || "Not provided"}</p>
             <p><strong>Return date/time:</strong> {formatUkDateTimeFromParts(quote.returnDate, quote.returnTime)}</p>
+            {quote.returnFlightNumber ? <p><strong>Return flight number:</strong> {quote.returnFlightNumber}</p> : null}
           </>
         ) : null}
         <p><strong>Passengers:</strong> {quote.passengers}</p>
