@@ -324,7 +324,11 @@ export interface AnalyticsEventRecord {
     | "ACCOUNT_QUOTES_VIEWED"
     | "ACCOUNT_QUOTE_DETAIL_VIEWED"
     | "QUOTE_ESTIMATE_STALE"
-    | "QUOTE_ESTIMATE_RECALCULATED";
+    | "QUOTE_ESTIMATE_RECALCULATED"
+    | "QUOTE_LOGIN_REQUIRED_SHOWN"
+    | "QUOTE_REGISTER_CLICKED"
+    | "QUOTE_SIGNIN_CLICKED"
+    | "QUOTE_SUBMITTED_AUTHENTICATED";
   path: string;
   referrer?: string;
   landingPage?: string;

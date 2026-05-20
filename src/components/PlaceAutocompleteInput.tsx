@@ -92,6 +92,7 @@ interface PlaceAutocompleteInputProps {
   latField: string;
   lngField: string;
   defaultValueFieldName?: string;
+  defaultValue?: string;
 }
 
 export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProps) {
@@ -242,6 +243,7 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
         id={inputId}
         ref={inputRef}
         name={props.locationNameField}
+        defaultValue={props.defaultValue || ""}
         required={props.required}
         placeholder={showFallback ? "Enter location manually" : "Search location"}
         className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2"

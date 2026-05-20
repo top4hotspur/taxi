@@ -35,6 +35,9 @@ export default function LoginPage() {
 export function LoginView({ mode = "customer" }: LoginViewProps) {
   const [error, setError] = useState("");
   const copy = copyByMode[mode];
+  const returnToParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("returnTo") || "" : "";
+  const safeReturnTo = returnToParam.startsWith("/") && !returnToParam.startsWith("//") ? returnToParam : "";
+  const registerHref = safeReturnTo ? `${copy.registerHref}?returnTo=${encodeURIComponent(safeReturnTo)}` : copy.registerHref;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,6 +66,11 @@ export function LoginView({ mode = "customer" }: LoginViewProps) {
       return;
     }
 
+    if (safeReturnTo) {
+      window.location.href = safeReturnTo;
+      return;
+    }
+
     window.location.href = data.role === "ADMIN" ? "/admin" : "/account";
   }
 
@@ -82,7 +90,7 @@ export function LoginView({ mode = "customer" }: LoginViewProps) {
         <button type="submit" className="rounded-full bg-slate-900 px-5 py-2 text-white">Login</button>
       </form>
       {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-      <p className="mt-4 text-sm"><Link href={copy.registerHref} className="underline">{copy.registerText}</Link></p>
+      <p className="mt-4 text-sm"><Link href={registerHref} className="underline">{copy.registerText}</Link></p>
     </section>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
 
 const countryOptions = [
@@ -34,6 +35,9 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
   const [message, setMessage] = useState("");
   const [accountType, setAccountType] = useState<"PERSONAL" | "BUSINESS">("PERSONAL");
   const [startTracked, setStartTracked] = useState(false);
+  const returnToParam = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("returnTo") || "" : "";
+  const safeReturnTo = returnToParam.startsWith("/") && !returnToParam.startsWith("//") ? returnToParam : "";
+  const loginHref = mode === "driver" ? "/driver/login" : safeReturnTo ? `/customer/login?returnTo=${encodeURIComponent(safeReturnTo)}` : "/customer/login";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,7 +68,7 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
     }
 
     trackAnalyticsEvent("CUSTOMER_REGISTERED", "/customer/register");
-    window.location.href = "/account";
+    window.location.href = safeReturnTo || "/account";
   }
 
   function trackStart() {
@@ -107,6 +111,9 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
   return (
     <section className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6">
       <h1 className="text-3xl font-bold">Create Customer Account</h1>
+      <p className="mt-2 text-sm text-slate-600">
+        Already have an account? <Link href={loginHref} className="underline">Sign in</Link>
+      </p>
       <form onSubmit={handleSubmit} onFocusCapture={trackStart} className="mt-6 grid gap-4 sm:grid-cols-2">
         <Input label="Email" name="email" type="email" required />
         <Input label="Password" name="password" type="password" required />

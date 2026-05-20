@@ -17,10 +17,23 @@ export async function POST(request: Request) {
     const payload = (await request.json()) as Record<string, unknown>;
 
     const session = await getCurrentSessionUser();
-    const requiredFields: string[] = [...required];
     if (!session || session.role !== "customer") {
-      requiredFields.push("name", "email", "phone");
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "LOGIN_REQUIRED",
+          error: "Please create an account or sign in before submitting your quote.",
+          message: "Please create an account or sign in before submitting your quote.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 401 }
+      );
     }
+
+    const requiredFields: string[] = [...required];
 
     for (const field of requiredFields) {
       if (typeof payload[field] !== "string" || !String(payload[field]).trim()) {
@@ -93,10 +106,10 @@ export async function POST(request: Request) {
 
     const result = await createQuote({
       correlationId,
-      customerId: session?.role === "customer" ? session.userId : undefined,
-      guestEmail: session ? undefined : String(payload.email),
-      guestName: session ? undefined : String(payload.name),
-      guestPhone: session ? undefined : String(payload.phone),
+      customerId: session.userId,
+      guestEmail: undefined,
+      guestName: undefined,
+      guestPhone: undefined,
       passengerName: String(payload.passengerName || "") || undefined,
       passengerPhone: String(payload.passengerPhone || "") || undefined,
       leadPassengerSameAsBooker,
@@ -166,11 +179,6 @@ export async function POST(request: Request) {
     emailAttempted = true;
     emailSkipped = !!result.email.requesterEmail.skipped;
 
-    const guestMessageBase = "Quote request received.";
-    const guestEmailMessage = result.email.requesterEmail.ok
-      ? " A confirmation email has been sent."
-      : " We received your request and will contact you shortly.";
-
     return NextResponse.json({
       ok: true,
       success: true,
@@ -181,9 +189,7 @@ export async function POST(request: Request) {
       emailSkipped,
       emailSent: result.email.requesterEmail.ok,
       ...(result.email.requesterEmail.ok ? {} : { errorCode: "EMAIL_FAILED_NON_BLOCKING" }),
-      message: session
-        ? "Quote request saved to your account."
-        : `${guestMessageBase}${guestEmailMessage} Create an account using the same email to track your request.`,
+      message: "Your quote request has been submitted and saved in your account.",
     });
   } catch (error) {
     let errorCode: "DB_CONFIG_MISSING" | "DB_WRITE_FAILED" | "UNKNOWN_ERROR" = "UNKNOWN_ERROR";
