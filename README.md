@@ -23,6 +23,7 @@ npm run build
 
 ## Key routes
 - `/quote`
+- `/verify`
 - `/account`
 - `/account/quotes/[id]`
 - `/admin`
@@ -265,6 +266,12 @@ CloudWatch correlation troubleshooting:
   - `CUSTOMER_REGISTERED`
   - `DRIVER_REGISTER_STARTED`
   - `DRIVER_REGISTERED`
+
+## External business validation
+- For external business validation checks (for example provider onboarding crawlers), use:
+  - `https://www.nitaxico.com/verify`
+- Public machine-check endpoint:
+  - `https://www.nitaxico.com/api/public/health`
 
 ## Scope guardrails
 - Driver onboarding: not included.
