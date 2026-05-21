@@ -159,6 +159,12 @@ WhatsApp notifications:
   - `POST /api/admin/notifications/whatsapp-test`
   - body: `{ "to": "+4479...", "template": "customer" }` or `{ "to": "+4479...", "template": "driver" }`
   - response includes safe diagnostics: `normalizedRecipient`, `templateSidPresent`, `templateSidLooksValid`, `fromLooksValid`, `twilioStatus`, `twilioErrorCode`.
+- Delivery status callback:
+  - Outbound Twilio sends include `statusCallback` automatically when `SITE_URL` is configured.
+  - Callback endpoint: `POST https://www.nitaxico.com/api/webhooks/twilio/status`
+  - Signature validation uses `TWILIO_AUTH_TOKEN` and is enforced in production.
+  - Admin callback diagnostics endpoint: `GET /api/admin/notifications/twilio-status-callback-info`
+  - Expected flow: quote shows `QUEUED` first, then callback updates status to `SENT`, `DELIVERED`, or `FAILED`.
 
 Email diagnostics:
 - Admin health includes:

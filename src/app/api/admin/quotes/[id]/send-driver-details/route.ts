@@ -159,6 +159,12 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   let driverWhatsAppTwilioErrorCode: string | undefined;
   let customerWhatsAppNormalizedRecipient: string | undefined;
   let driverWhatsAppNormalizedRecipient: string | undefined;
+  let customerWhatsAppStatusUpdatedAt: string | undefined;
+  let driverWhatsAppStatusUpdatedAt: string | undefined;
+  let customerWhatsAppDeliveredAt: string | undefined;
+  let driverWhatsAppDeliveredAt: string | undefined;
+  let customerWhatsAppFailedAt: string | undefined;
+  let driverWhatsAppFailedAt: string | undefined;
 
   if (customerEmailTo) {
     try {
@@ -220,6 +226,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       customerWhatsAppSentAt = nowIso;
       customerWhatsAppMessageSid = wa.providerMessageId || undefined;
       customerWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      customerWhatsAppStatusUpdatedAt = nowIso;
+      if (customerWhatsAppStatus === "DELIVERED") customerWhatsAppDeliveredAt = nowIso;
       customerWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       customerWhatsAppError = undefined;
       summary.customerWhatsAppMessageSid = wa.providerMessageId || null;
@@ -236,6 +244,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       customerWhatsAppError = statusFromReason(wa.reason);
       customerWhatsAppTwilioErrorCode = wa.twilioErrorCode || wa.errorCode || undefined;
       customerWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      customerWhatsAppStatusUpdatedAt = nowIso;
+      customerWhatsAppFailedAt = nowIso;
       customerWhatsAppMessageSid = wa.providerMessageId || undefined;
       customerWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       summary.detailMessages.push(`Customer WhatsApp failed: ${customerWhatsAppError}`);
@@ -320,6 +330,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       driverWhatsAppSentAt = nowIso;
       driverWhatsAppMessageSid = wa.providerMessageId || undefined;
       driverWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      driverWhatsAppStatusUpdatedAt = nowIso;
+      if (driverWhatsAppStatus === "DELIVERED") driverWhatsAppDeliveredAt = nowIso;
       driverWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       driverWhatsAppError = undefined;
       summary.driverWhatsAppMessageSid = wa.providerMessageId || null;
@@ -336,6 +348,8 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
       driverWhatsAppError = statusFromReason(wa.reason);
       driverWhatsAppTwilioErrorCode = wa.twilioErrorCode || wa.errorCode || undefined;
       driverWhatsAppTwilioStatus = wa.twilioDeliveryStatus || undefined;
+      driverWhatsAppStatusUpdatedAt = nowIso;
+      driverWhatsAppFailedAt = nowIso;
       driverWhatsAppMessageSid = wa.providerMessageId || undefined;
       driverWhatsAppNormalizedRecipient = wa.normalizedRecipient || undefined;
       summary.detailMessages.push(`Driver WhatsApp failed: ${driverWhatsAppError}`);
@@ -416,9 +430,17 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     customerWhatsAppMessageSid,
     driverWhatsAppMessageSid,
     customerWhatsAppTwilioStatus,
+    customerWhatsAppTwilioStatusRaw: customerWhatsAppTwilioStatus,
     driverWhatsAppTwilioStatus,
+    driverWhatsAppTwilioStatusRaw: driverWhatsAppTwilioStatus,
     customerWhatsAppTwilioErrorCode,
     driverWhatsAppTwilioErrorCode,
+    customerWhatsAppDeliveredAt,
+    driverWhatsAppDeliveredAt,
+    customerWhatsAppFailedAt,
+    driverWhatsAppFailedAt,
+    customerWhatsAppStatusUpdatedAt,
+    driverWhatsAppStatusUpdatedAt,
     customerWhatsAppRecipient: customerPhoneTo || undefined,
     driverWhatsAppRecipient: driverPhoneTo || undefined,
     customerWhatsAppNormalizedRecipient,

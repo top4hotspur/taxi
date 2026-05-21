@@ -10,6 +10,7 @@ export type TwilioChannelResult = {
   twilioErrorCode?: string | null;
   twilioDeliveryStatus?: string | null;
   normalizedRecipient?: string;
+  statusCallbackConfigured?: boolean;
 };
 
 export type SendPhoneMessageInput = {
@@ -109,6 +110,11 @@ async function sendTwilioMessage(params: {
   } else if (params.body) {
     form.set("Body", params.body.slice(0, 1300));
   }
+  const siteUrl = process.env.SITE_URL?.trim();
+  const statusCallback = siteUrl ? `${siteUrl.replace(/\/+$/, "")}/api/webhooks/twilio/status` : "";
+  if (statusCallback) {
+    form.set("StatusCallback", statusCallback);
+  }
 
   const basic = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
@@ -142,6 +148,7 @@ async function sendTwilioMessage(params: {
     providerMessageId: payload?.sid,
     twilioStatus: response.status,
     twilioDeliveryStatus: payload?.status || null,
+    statusCallbackConfigured: Boolean(statusCallback),
   } as TwilioChannelResult;
 }
 
@@ -195,7 +202,6 @@ export async function sendSms(input: SendPhoneMessageInput): Promise<TwilioChann
 }
 
 export function getTwilioNotificationHealth() {
-  // TODO: Add Twilio status-callback webhook to transition WhatsApp states from QUEUED to DELIVERED/FAILED.
   const twilioAccountSidPresent = Boolean(process.env.TWILIO_ACCOUNT_SID?.trim());
   const twilioAuthTokenPresent = Boolean(process.env.TWILIO_AUTH_TOKEN?.trim());
   const whatsappFromPresent = Boolean(process.env.TWILIO_WHATSAPP_FROM?.trim());
@@ -203,6 +209,10 @@ export function getTwilioNotificationHealth() {
   const smsFromNumberPresent = Boolean(process.env.TWILIO_FROM_NUMBER?.trim());
   const customerWhatsAppTemplatePresent = whatsappTemplateConfigured("customer");
   const driverWhatsAppTemplatePresent = whatsappTemplateConfigured("driver");
+  const siteUrl = process.env.SITE_URL?.trim();
+  const twilioStatusCallbackUrl = siteUrl ? `${siteUrl.replace(/\/+$/, "")}/api/webhooks/twilio/status` : null;
+  const twilioStatusCallbackConfigured = Boolean(siteUrl && twilioAuthTokenPresent);
+  const twilioWebhookSignatureVerificationEnabled = process.env.NODE_ENV === "production" && twilioAuthTokenPresent;
 
   return {
     twilioAccountSidPresent,
@@ -212,6 +222,9 @@ export function getTwilioNotificationHealth() {
     smsFromNumberPresent,
     customerWhatsAppTemplatePresent,
     driverWhatsAppTemplatePresent,
+    twilioStatusCallbackConfigured,
+    twilioStatusCallbackUrl,
+    twilioWebhookSignatureVerificationEnabled,
     whatsappConfigured:
       twilioAccountSidPresent &&
       twilioAuthTokenPresent &&

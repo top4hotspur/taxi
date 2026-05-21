@@ -212,7 +212,8 @@ export default function AccountQuoteDetail() {
           <p>We&apos;ve emailed these details to you. If WhatsApp delivery is available, you may also receive them by WhatsApp.</p>
           <p>Driver details are saved here as well as sent by email.</p>
           {quote.customerWhatsAppStatus === "QUEUED" ? <p className="text-xs text-slate-600">WhatsApp message queued by our provider.</p> : null}
-          {(quote.customerWhatsAppStatus === "SENT" || quote.customerWhatsAppStatus === "DELIVERED") ? <p className="text-xs text-slate-600">WhatsApp message sent.</p> : null}
+          {quote.customerWhatsAppStatus === "SENT" ? <p className="text-xs text-slate-600">WhatsApp message sent.</p> : null}
+          {quote.customerWhatsAppStatus === "DELIVERED" ? <p className="text-xs text-slate-600">WhatsApp message delivered.</p> : null}
         </article>
       ) : null}
 

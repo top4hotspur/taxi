@@ -156,7 +156,11 @@ export interface QuoteRecord {
   customerWhatsAppError?: string;
   customerWhatsAppMessageSid?: string;
   customerWhatsAppTwilioStatus?: string;
+  customerWhatsAppTwilioStatusRaw?: string;
   customerWhatsAppTwilioErrorCode?: string;
+  customerWhatsAppDeliveredAt?: string;
+  customerWhatsAppFailedAt?: string;
+  customerWhatsAppStatusUpdatedAt?: string;
   customerWhatsAppRecipient?: string;
   customerWhatsAppNormalizedRecipient?: string;
   customerWhatsAppTemplateSid?: string;
@@ -182,7 +186,11 @@ export interface QuoteRecord {
   driverWhatsAppError?: string;
   driverWhatsAppMessageSid?: string;
   driverWhatsAppTwilioStatus?: string;
+  driverWhatsAppTwilioStatusRaw?: string;
   driverWhatsAppTwilioErrorCode?: string;
+  driverWhatsAppDeliveredAt?: string;
+  driverWhatsAppFailedAt?: string;
+  driverWhatsAppStatusUpdatedAt?: string;
   driverWhatsAppRecipient?: string;
   driverWhatsAppNormalizedRecipient?: string;
   driverWhatsAppTemplateSid?: string;
@@ -694,6 +702,20 @@ export const db = {
       Limit: 1,
     }));
     return (fallback.Items?.[0] as QuoteRecord | undefined) || undefined;
+  },
+
+  async findQuoteByCommunicationSid(messageSid: string) {
+    const sid = String(messageSid || "").trim();
+    if (!sid) return null;
+    const result = await ddb.send(
+      new ScanCommand({
+        TableName: TABLE_QUOTES,
+        FilterExpression: "customerWhatsAppMessageSid = :sid OR driverWhatsAppMessageSid = :sid",
+        ExpressionAttributeValues: { ":sid": sid },
+        Limit: 1,
+      })
+    );
+    return (result.Items?.[0] as QuoteRecord | undefined) || null;
   },
 
   async findQuotesByCustomer(userId: string) {
