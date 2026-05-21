@@ -148,6 +148,12 @@ type Quote = {
   updatedAt: string;
 };
 
+type AdminHealthSummary = {
+  squarePaymentReady?: boolean;
+  squareClientConfigured?: boolean;
+  squareClientGuidance?: string | null;
+};
+
 type DriverOption = {
   id: string;
   name: string;
@@ -241,6 +247,7 @@ export default function AdminQuoteDetailPage() {
     errorMessage?: string | null;
     sentAt?: string | null;
   } | null>(null);
+  const [health, setHealth] = useState<AdminHealthSummary | null>(null);
 
   useEffect(() => {
     const id = params.id;
@@ -263,6 +270,20 @@ export default function AdminQuoteDetailPage() {
       const list = Array.isArray(data.drivers) ? data.drivers as DriverOption[] : [];
       setDrivers(list.filter((d) => d.isActive));
     }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/admin/health", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        setHealth({
+          squarePaymentReady: Boolean(data.squarePaymentReady),
+          squareClientConfigured: Boolean(data.squareClientConfigured),
+          squareClientGuidance: data.squareClientGuidance || null,
+        });
+      })
+      .catch(() => undefined);
   }, []);
 
   const luggageLines = useMemo(() => {
@@ -484,6 +505,13 @@ export default function AdminQuoteDetailPage() {
           <p>Amount paid: {formatMoney(quote.paymentAmount ?? quote.confirmedPrice ?? quote.quotedPrice, quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP")}</p>
           <p>Paid at: {quote.paidAt ? formatUkDateTime(quote.paidAt) : "Not available"}</p>
           <p>Square payment ID: {quote.squarePaymentId || "Not available"}</p>
+        </article>
+      ) : null}
+
+      {quote.paymentStatus === "PAYMENT_REQUIRED" && health?.squarePaymentReady === false ? (
+        <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
+          <p className="font-semibold">This quote is ready for payment, but Square client configuration is incomplete. Customers will not see the online payment form.</p>
+          {health.squareClientGuidance ? <p className="mt-1 text-xs">{health.squareClientGuidance}</p> : null}
         </article>
       ) : null}
 

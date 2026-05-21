@@ -73,6 +73,10 @@ export async function GET() {
     (squareEnvironment === "production" && productionAppId);
   const squareServerConfigured = squareModeValid && squareAccessTokenPresent && squareLocationIdPresent;
   const squareClientConfigured = squareApplicationIdPresent && squareClientLocationIdPresent && squareModeAppIdMatch;
+  const squarePaymentReady = squareServerConfigured && squareClientConfigured && squareModeValid;
+  const squareClientGuidance = !squareClientConfigured
+    ? "Set NEXT_PUBLIC_SQUARE_APPLICATION_ID and NEXT_PUBLIC_SQUARE_LOCATION_ID in Amplify, then redeploy."
+    : null;
   const twilioHealth = getTwilioNotificationHealth();
   const whatsappTemplateGuidance =
     twilioHealth.whatsappNotificationsEnabled &&
@@ -137,6 +141,8 @@ export async function GET() {
     squareModeValid,
     squareServerConfigured,
     squareClientConfigured,
+    squarePaymentReady,
+    squareClientGuidance,
     squareModeAppIdMatch,
     smsConfigured: twilioHealth.twilioAccountSidPresent && twilioHealth.twilioAuthTokenPresent && twilioHealth.smsFromNumberPresent,
     twilioAccountSidPresent: twilioHealth.twilioAccountSidPresent,

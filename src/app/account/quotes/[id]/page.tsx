@@ -261,7 +261,7 @@ export default function AccountQuoteDetail() {
               />
             ) : (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-                Online payment is not available right now. Please contact us to confirm your booking.
+                Online payment is temporarily unavailable. Please try again shortly or contact us.
               </div>
             )
           ) : null}
