@@ -397,6 +397,33 @@ export default function AdminQuoteDetailPage() {
     }
   }
 
+  async function deleteCurrentQuote() {
+    if (!quote || saving) return;
+    const baseWarning = "Delete this quote? This will permanently remove the quote and cannot be undone.";
+    const paidWarning = "This quote has a recorded payment. Deleting it will remove the quote from the admin list but will not refund the Square payment. Are you sure?";
+    const confirmation = window.confirm(quote.paymentStatus === "PAID" ? paidWarning : baseWarning);
+    if (!confirmation) return;
+
+    setSaving(true);
+    setError("");
+    setBanner(null);
+    try {
+      const response = await fetch(`/api/admin/quotes/${quote.id}`, { method: "DELETE" });
+      const result = (await response.json()) as { ok?: boolean; message?: string };
+      if (!response.ok || !result.ok) {
+        setError(result.message || "Could not delete quote.");
+        setBanner({ tone: "error", message: result.message || "Could not delete quote." });
+        return;
+      }
+      window.location.href = "/admin/quotes?deleted=1";
+    } catch {
+      setError("Could not delete quote.");
+      setBanner({ tone: "error", message: "Could not delete quote." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <section className="space-y-6">
       <header>
@@ -583,6 +610,7 @@ export default function AdminQuoteDetailPage() {
         <button disabled={saving} onClick={() => action("mark_accepted")} className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-60">Set Accepted</button>
         <button disabled={saving} onClick={() => action("mark_declined")} className="rounded bg-red-700 px-4 py-2 text-white disabled:opacity-60">Set Declined</button>
         <button disabled={saving} onClick={() => action("mark_cancelled")} className="rounded bg-slate-500 px-4 py-2 text-white disabled:opacity-60">Set Cancelled</button>
+        <button disabled={saving} onClick={() => void deleteCurrentQuote()} className="rounded border border-red-300 bg-red-50 px-4 py-2 text-red-700 disabled:opacity-60">Delete quote</button>
       </div>
 
       {notifyResult ? (

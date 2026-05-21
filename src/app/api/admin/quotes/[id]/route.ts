@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { normalizeQuoteStatus, type QuoteStatusValue } from "@/lib/quote/constants";
 import { db } from "@/lib/db";
 import { getCurrentSessionUser, isAdminUser } from "@/lib/auth/guards";
@@ -130,4 +131,39 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     emailSent,
     emailError,
   });
+}
+
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentSessionUser();
+  if (!isAdminUser(user)) {
+    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await context.params;
+  const correlationId = crypto.randomUUID();
+
+  const existing = await db.findQuoteById(id);
+  if (!existing) {
+    return NextResponse.json({ ok: false, message: "Quote not found." }, { status: 404 });
+  }
+
+  try {
+    await db.deleteQuoteAdmin(id, {
+      correlationId,
+      deletedByUserId: user?.userId,
+      deletedByRole: "admin",
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "api.admin.quotes.delete",
+        correlationId,
+        quoteId: id,
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
+    );
+    return NextResponse.json({ ok: false, message: "Could not delete quote." }, { status: 500 });
+  }
 }

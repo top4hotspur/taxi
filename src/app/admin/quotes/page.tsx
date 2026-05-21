@@ -21,6 +21,7 @@ type Quote = {
   paidAt?: string;
   paymentAmount?: number;
   paymentCurrency?: string;
+  squarePaymentId?: string;
   guestName?: string;
   guestEmail?: string;
   customer?: { email?: string } | null;
@@ -55,6 +56,17 @@ export default function AdminQuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [status, setStatus] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(() => {
+    if (typeof window === "undefined") return null;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("deleted") === "1") {
+      url.searchParams.delete("deleted");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      return { tone: "success", message: "Quote deleted." };
+    }
+    return null;
+  });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -74,9 +86,40 @@ export default function AdminQuotesPage() {
 
   const rows = useMemo(() => quotes.sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [quotes]);
 
+  async function deleteQuote(quote: Quote) {
+    const customer = (quote.guestName || quote.customer?.email || quote.guestEmail || "customer").trim();
+    const dateTime = formatUkDateTime(`${quote.pickupDate}T${quote.pickupTime}`);
+    const standardMessage = "Delete this quote? This will permanently remove the quote and cannot be undone.";
+    const paidMessage = "This quote has a recorded payment. Deleting it will remove the quote from the admin list but will not refund the Square payment. Are you sure?";
+    const confirmMessage = quote.paymentStatus === "PAID" ? paidMessage : `${standardMessage}\n\nQuote for ${customer} on ${dateTime}.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setDeletingId(quote.id);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/admin/quotes/${quote.id}`, { method: "DELETE" });
+      const result = (await response.json()) as { ok?: boolean; message?: string };
+      if (!response.ok || !result.ok) {
+        setFeedback({ tone: "error", message: result.message || "Could not delete quote." });
+        return;
+      }
+      setQuotes((current) => current.filter((row) => row.id !== quote.id));
+      setFeedback({ tone: "success", message: "Quote deleted." });
+    } catch {
+      setFeedback({ tone: "error", message: "Could not delete quote." });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <section className="space-y-6">
       <h1 className="text-3xl font-bold">Admin Quotes</h1>
+      {feedback ? (
+        <div className={`rounded-xl border px-3 py-2 text-sm ${feedback.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-800"}`}>
+          {feedback.message}
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-3">
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded border border-slate-300 px-3 py-2">
           <option value="">All statuses</option>
@@ -136,7 +179,18 @@ export default function AdminQuotesPage() {
                   <td className="px-3 py-2">{formatMoney(quote.confirmedPrice ?? quote.quotedPrice, quote.confirmedCurrency || quote.quotedCurrency || "GBP")}</td>
                   <td className="px-3 py-2">{formatUkDateTime(quote.createdAt)}</td>
                   <td className="px-3 py-2">
-                    <Link href={`/admin/quotes/${quote.id}`} className="underline">View / Edit</Link>
+                    <div className="flex flex-col items-start gap-2">
+                      <Link href={`/admin/quotes/${quote.id}`} className="underline">View / Edit</Link>
+                      <button
+                        type="button"
+                        onClick={() => void deleteQuote(quote)}
+                        disabled={deletingId === quote.id}
+                        aria-label={`Delete quote for ${(quote.guestName || quote.customer?.email || quote.guestEmail || "customer").trim()} on ${formatUkDateTime(`${quote.pickupDate}T${quote.pickupTime}`)}`}
+                        className="text-xs font-medium text-red-700 underline disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingId === quote.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

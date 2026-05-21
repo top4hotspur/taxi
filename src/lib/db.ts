@@ -470,6 +470,41 @@ async function deleteWithDiagnostics(idValue: string, ctx: DbWriteContext) {
   }
 }
 
+async function deleteItemWithDiagnostics(item: Record<string, unknown>, ctx: DbWriteContext) {
+  try {
+    const schema = await getTableKeySchema(ctx.tableName);
+    const partitionValue = item[schema.partitionKeyName];
+    if (partitionValue === undefined || partitionValue === null || partitionValue === "") {
+      throw new Error(`Missing partition key '${schema.partitionKeyName}' for delete operation`);
+    }
+    const key: Record<string, unknown> = { [schema.partitionKeyName]: partitionValue };
+    if (schema.sortKeyName) {
+      const sortValue = item[schema.sortKeyName];
+      if (sortValue === undefined || sortValue === null || sortValue === "") {
+        throw new Error(`Missing sort key '${schema.sortKeyName}' for delete operation`);
+      }
+      key[schema.sortKeyName] = sortValue;
+    }
+    await ddb.send(new DeleteCommand({ TableName: ctx.tableName, Key: key }));
+  } catch (error) {
+    const awsError = error as { name?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "db.delete",
+        correlationId: ctx.correlationId || null,
+        operation: ctx.operation,
+        tableEnvVar: ctx.tableEnvVar,
+        tableName: ctx.tableName,
+        awsErrorName: awsError?.name || "UnknownAwsError",
+        awsErrorMessage: awsError?.message || "Unknown AWS SDK error",
+        httpStatusCode: awsError?.$metadata?.httpStatusCode ?? null,
+      })
+    );
+    throw error;
+  }
+}
+
 export const db = {
   async findUserByEmail(email: string) {
     const result = await ddb.send(new ScanCommand({ TableName: TABLE_USERS, FilterExpression: "email = :email", ExpressionAttributeValues: { ":email": email.toLowerCase() }, Limit: 1 }));
@@ -826,6 +861,51 @@ export const db = {
     }
 
     return records;
+  },
+
+  async deleteQuoteAdmin(
+    quoteId: string,
+    options?: { correlationId?: string; deletedByUserId?: string; deletedByRole?: string }
+  ) {
+    assertDbWriteConfig();
+    const quote = await this.findQuoteById(quoteId);
+    if (!quote) return null;
+
+    await this.createAudit(
+      {
+        quoteId: quote.id,
+        changedByRole: options?.deletedByRole || "admin",
+        changedByUserId: options?.deletedByUserId,
+        previousStatus: quote.status,
+        newStatus: "ADMIN_QUOTE_DELETED",
+        note: JSON.stringify({
+          action: "ADMIN_QUOTE_DELETED",
+          paymentStatus: quote.paymentStatus || "NOT_REQUIRED",
+          squarePaymentId: quote.squarePaymentId || null,
+          deletedAt: now(),
+        }),
+      },
+      { correlationId: options?.correlationId }
+    );
+
+    const booking = await this.getBookingForQuote(quoteId);
+    if (booking) {
+      await deleteItemWithDiagnostics(booking as unknown as Record<string, unknown>, {
+        correlationId: options?.correlationId,
+        operation: "deleteQuoteAdmin.booking",
+        tableEnvVar: "DDB_TABLE_BOOKINGS",
+        tableName: TABLE_BOOKINGS,
+      });
+    }
+
+    await deleteItemWithDiagnostics(quote as unknown as Record<string, unknown>, {
+      correlationId: options?.correlationId,
+      operation: "deleteQuoteAdmin.quote",
+      tableEnvVar: "DDB_TABLE_QUOTES",
+      tableName: TABLE_QUOTES,
+    });
+
+    return quote;
   },
 
   async createAdminDriverProfile(
