@@ -12,8 +12,12 @@ export default async function QuoteConfirmationPage({ searchParams }: { searchPa
       <QuoteConfirmationTracker />
       <h1 className="text-3xl font-bold text-slate-900">Your quote request has been submitted</h1>
       <p className="text-slate-700">
-        Your request is now saved in your account. We&apos;ll review the journey details, confirm driver availability, and update the quote shortly.
+        Your quote request has been submitted and saved in your account.
       </p>
+      <p className="text-slate-700">
+        We&apos;ll email you when your confirmed quote is ready. If you don&apos;t see the email, please check your junk/spam folder.
+      </p>
+      <p className="text-slate-700">You can also view the latest status any time in your account.</p>
 
       {quote && (
         <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">

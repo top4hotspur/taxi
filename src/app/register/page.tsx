@@ -114,6 +114,10 @@ export function RegisterView({ mode = "customer" }: { mode?: "customer" | "drive
       <p className="mt-2 text-sm text-slate-600">
         Already have an account? <Link href={loginHref} className="underline">Sign in</Link>
       </p>
+      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+        <p>Important: we&apos;ll send quote updates, payment links and driver details by email. Please check your junk/spam folder if you don&apos;t see our emails.</p>
+        <p className="mt-1">You can always view your quote updates in your NI Taxi Co account.</p>
+      </div>
       <form onSubmit={handleSubmit} onFocusCapture={trackStart} className="mt-6 grid gap-4 sm:grid-cols-2">
         <Input label="Email" name="email" type="email" required />
         <Input label="Password" name="password" type="password" required />

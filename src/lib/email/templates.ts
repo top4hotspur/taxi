@@ -28,6 +28,10 @@ function emailFooter() {
   ].join("\n");
 }
 
+function accountDeliveryFooter() {
+  return "You can also view this update in your NI Taxi Co account. If future emails do not appear in your inbox, please check your junk/spam folder.";
+}
+
 export function customerQuoteRequestedEmail(params: { quote: QuoteRecord; recipientName?: string; isGuest: boolean }) {
   const intro = params.isGuest
     ? "Thank you for your quote request. We have received your details and will respond shortly."
@@ -38,7 +42,7 @@ export function customerQuoteRequestedEmail(params: { quote: QuoteRecord; recipi
 
   return {
     subject: `Quote request received (${params.quote.id})`,
-    text: `${intro}\n\n${quoteSummary(params.quote)}${guestGuidance}\n\n${emailFooter()}`,
+    text: `${intro}\n\n${quoteSummary(params.quote)}${guestGuidance}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
   };
 }
 
@@ -75,7 +79,7 @@ export function customerQuoteSentEmail(quote: QuoteRecord, isGuest: boolean) {
     : `Review and respond here: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: "Your NI Taxi Co quote is ready",
-    text: `Your quote is ready.\n${priceLine}\n${expiryLine}\n\n${journeySummary}\n\n${quote.adminCustomerMessage ? `Message from NI Taxi Co:\n${quote.adminCustomerMessage}\n\n` : ""}${cta}\n\nQuote reference: ${quote.id}\n\n${emailFooter()}`,
+    text: `Your quote is ready.\n${priceLine}\n${expiryLine}\n\n${journeySummary}\n\n${quote.adminCustomerMessage ? `Message from NI Taxi Co:\n${quote.adminCustomerMessage}\n\n` : ""}${cta}\n\nQuote reference: ${quote.id}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
   };
 }
 
@@ -112,7 +116,7 @@ export function customerBookingConfirmedEmail(quote: QuoteRecord, isGuest: boole
   const track = isGuest ? "Reply to this email for any changes." : `View booking quote details: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Booking confirmed (${quote.id})`,
-    text: `Your booking is confirmed.\n\nJourney summary:\n${quoteSummary(quote)}\n\nDriver details: To be shared before travel (placeholder).\n\n${track}\n\n${emailFooter()}`,
+    text: `Your booking is confirmed.\n\nJourney summary:\n${quoteSummary(quote)}\n\nDriver details: To be shared before travel (placeholder).\n\n${track}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
   };
 }
 
@@ -129,7 +133,7 @@ export function customerPaymentConfirmedEmail(quote: QuoteRecord, isGuest: boole
   const track = isGuest ? "Reply to this email for any booking updates." : `View quote details: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Payment received (${quote.id})`,
-    text: `Thank you. We have received your payment.\n\nPaid amount: ${currency} ${amount}\nQuote reference: ${quote.id}\nJourney: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\nWe'll confirm final booking/driver details shortly.\n\n${track}\n\n${emailFooter()}`,
+    text: `Thank you. We have received your payment.\n\nPaid amount: ${currency} ${amount}\nQuote reference: ${quote.id}\nJourney: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\nWe'll confirm final booking/driver details shortly.\n\n${track}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
   };
 }
 
@@ -151,7 +155,7 @@ export function customerDriverDetailsEmail(quote: QuoteRecord, recipientName?: s
   const driverPhoto = quote.assignedDriverPhotoUrl ? `Driver photo: ${quote.assignedDriverPhotoUrl}\n` : "";
   return {
     subject: "Your NI Taxi Co driver details",
-    text: `Hi ${displayName},\n\nYour driver details are now available.\n\nJourney:\n${journey}\nDate/time: ${quote.pickupDate} ${quote.pickupTime}\n${returnLine}\n\nDriver:\nName: ${quote.assignedDriverName || "Not provided"}\nPhone: ${quote.assignedDriverPhone || "Not provided"}\nCar: ${quote.assignedVehicleMake || "Not provided"}\nRegistration: ${quote.assignedVehicleRegistration || "Not provided"}\n${driverPhoto}\nPlease keep these details available for your journey.\n\n${emailFooter()}`,
+    text: `Hi ${displayName},\n\nYour driver details are now available.\n\nJourney:\n${journey}\nDate/time: ${quote.pickupDate} ${quote.pickupTime}\n${returnLine}\n\nDriver:\nName: ${quote.assignedDriverName || "Not provided"}\nPhone: ${quote.assignedDriverPhone || "Not provided"}\nCar: ${quote.assignedVehicleMake || "Not provided"}\nRegistration: ${quote.assignedVehicleRegistration || "Not provided"}\n${driverPhoto}\nPlease keep these details available for your journey.\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
   };
 }
 

@@ -173,6 +173,16 @@ Email diagnostics:
   - `type` supports: `simple`, `customer-driver`, `driver-job`
 - Assignment communication records now persist provider evidence (`providerMessageId`, recipients, statuses, and safe error codes).
 
+Email deliverability checklist:
+- Resend domain must be verified.
+- SPF/DKIM must pass.
+- DMARC should be present.
+- `EMAIL_FROM` should use the verified domain.
+- Avoid `no-reply` sender wording where possible.
+- Keep transactional emails short and relevant.
+- Tell customers to check junk/spam.
+- Treat the account page as the source of truth for quote/payment/driver details.
+
 Driver photo upload troubleshooting:
 1. Confirm Amplify env var: `DRIVER_PHOTOS_BUCKET=ni-taxi-driver-photos`
 2. Confirm bucket exists in `eu-west-2`

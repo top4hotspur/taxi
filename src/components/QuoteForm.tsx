@@ -328,6 +328,8 @@ export default function QuoteForm() {
           <h2 className="text-lg font-semibold text-slate-900">Create an account to request your quote</h2>
           <p>Your quote, confirmed price, payment link and driver details will be saved in your account.</p>
           <p>To request a quote, please create an account or sign in. This lets you return later to view your confirmed price, accept the quote, pay securely, and receive driver details.</p>
+          <p>Important: we&apos;ll send quote updates, payment links and driver details by email. Please check your junk/spam folder if you don&apos;t see our emails.</p>
+          <p>You can always view your quote updates in your NI Taxi Co account.</p>
           <div className="flex flex-wrap gap-2">
             <Link
               href="/customer/register?returnTo=/quote"
@@ -582,6 +584,11 @@ export default function QuoteForm() {
       <button type="submit" disabled={status === "loading"} className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500">
         {status === "loading" ? "Submitting..." : "Submit Quote Request"}
       </button>
+      {customerContext.loggedInCustomer ? (
+        <p className="text-sm text-slate-600">
+          We&apos;ll email quote updates to your account email address. Please check your junk/spam folder if an email doesn&apos;t arrive. We may also send key updates by WhatsApp where available.
+        </p>
+      ) : null}
       {message && <p className="text-sm text-red-700">{message}</p>}
       {showLoginRequired && !customerContext.loggedInCustomer ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">

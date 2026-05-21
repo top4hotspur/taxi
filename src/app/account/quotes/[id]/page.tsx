@@ -210,6 +210,7 @@ export default function AccountQuoteDetail() {
           </div>
           <p>Your driver has been assigned. Please keep these details available for your journey.</p>
           <p>We&apos;ve emailed these details to you. If WhatsApp delivery is available, you may also receive them by WhatsApp.</p>
+          <p>Driver details are saved here as well as sent by email.</p>
           {quote.customerWhatsAppStatus === "QUEUED" ? <p className="text-xs text-slate-600">WhatsApp message queued by our provider.</p> : null}
           {(quote.customerWhatsAppStatus === "SENT" || quote.customerWhatsAppStatus === "DELIVERED") ? <p className="text-xs text-slate-600">WhatsApp message sent.</p> : null}
         </article>
@@ -228,6 +229,7 @@ export default function AccountQuoteDetail() {
           <p className="text-lg font-semibold">Your quote is ready</p>
           <p><strong>Confirmed quote:</strong> {formatMoney(model.confirmedAmount, model.confirmedCurrency)}</p>
           {quote.adminCustomerMessage ? <p><strong>Message from NI Taxi Co:</strong> {quote.adminCustomerMessage}</p> : null}
+          <p>Your quote is also saved here, so you can return to this page if the email is missed.</p>
           <p>{quote.quoteExpiresAt ? `This quote is valid until ${formatUkDateTime(quote.quoteExpiresAt)}.` : "This quote is valid for 24 hours unless otherwise agreed."}</p>
 
           <div className="flex flex-wrap gap-3">
@@ -267,7 +269,7 @@ export default function AccountQuoteDetail() {
 
       {!model.isPaid && !model.isExpired && !model.isQuotedAndPayable ? (
         <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-          We&apos;re reviewing your quote and will update it shortly.
+          We&apos;re reviewing your quote and will update it shortly. We&apos;ll email you when your confirmed quote is ready. Please check your junk/spam folder if you don&apos;t see it.
         </article>
       ) : null}
 

@@ -56,6 +56,8 @@ export async function GET() {
     emailProvider === "resend"
       ? "Check Resend dashboard logs and domain/sender verification if email sends fail."
       : "Email provider not configured.";
+  const emailDeliverabilityGuidance =
+    "Verify Resend DNS, SPF/DKIM/DMARC, and use a verified EMAIL_FROM domain. Customers may still need to check junk/spam.";
   const squareEnvironment = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() || "missing";
   const squareAccessTokenPresent = Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim());
   const squareLocationIdPresent = Boolean(process.env.SQUARE_LOCATION_ID?.trim());
@@ -124,6 +126,7 @@ export async function GET() {
     adminEmailPresent,
     emailConfigured,
     emailGuidance,
+    emailDeliverabilityGuidance,
     googleMapsPublicKeyPresent: Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim()),
     googleRoutesApiKeyPresent: Boolean(process.env.GOOGLE_ROUTES_API_KEY?.trim()),
     squareAccessTokenPresent,
