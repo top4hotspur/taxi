@@ -3,12 +3,37 @@ import { siteConfig } from "@/lib/siteContent";
 
 const siteUrl = process.env.SITE_URL || "https://www.nitaxico.com";
 
+function formatUkDateTime(value?: string) {
+  if (!value) return "Not provided";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/London",
+  });
+}
+
+function formatUkDateTimeFromParts(datePart?: string, timePart?: string) {
+  if (!datePart || !timePart) return "Not provided";
+  return formatUkDateTime(`${datePart}T${timePart}`);
+}
+
+function formatCurrencyForCustomer(amount?: number, currency = "GBP") {
+  if (amount === undefined || amount === null || Number.isNaN(amount)) return "Pending";
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(amount);
+}
+
 function quoteSummary(quote: QuoteRecord) {
   return [
     `Quote ID: ${quote.id}`,
     `Service: ${quote.serviceType}`,
     `Route: ${quote.pickupLocation} -> ${quote.dropoffLocation}`,
-    `Date/Time: ${quote.pickupDate} ${quote.pickupTime}`,
+    `Date/Time: ${formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime)}`,
     `Outward flight number: ${quote.outwardFlightNumber || "N/A"}`,
     `Return flight number: ${quote.returnFlightNumber || "N/A"}`,
     `Passengers: ${quote.passengers}`,
@@ -22,7 +47,6 @@ function quoteSummary(quote: QuoteRecord) {
 function emailFooter() {
   return [
     siteConfig.name,
-    `Phone: ${siteConfig.phone}`,
     `Email: ${siteConfig.email}`,
     `Registered Company Number: ${siteConfig.companyNumber}`,
   ].join("\n");
@@ -66,20 +90,18 @@ export function customerQuoteUpdatedEmail(quote: QuoteRecord, isGuest: boolean) 
 export function customerQuoteSentEmail(quote: QuoteRecord, isGuest: boolean) {
   const amount = quote.confirmedPrice ?? quote.quotedPrice;
   const currency = quote.confirmedCurrency || quote.quotedCurrency || "GBP";
-  const priceLine = amount !== undefined ? `Confirmed quote: ${currency} ${amount}` : "Confirmed quote: Pending";
-  const expiryLine = quote.quoteExpiresAt ? `Valid until: ${new Date(quote.quoteExpiresAt).toLocaleString("en-GB", { timeZone: "Europe/London" })}` : "Valid for 24 hours unless otherwise agreed.";
-  const journeySummary = [
-    `Outward: ${quote.pickupLocation} -> ${quote.dropoffLocation} (${quote.pickupDate} ${quote.pickupTime})`,
-    quote.returnJourney || quote.returnJourneyNeeded
-      ? `Return: ${(quote.returnPickup || "Not provided")} -> ${(quote.returnDropoff || "Not provided")} (${quote.returnDate || "Not provided"} ${quote.returnTime || ""})`
-      : "Return: No",
-  ].join("\n");
+  const priceLine = `Confirmed quote: ${formatCurrencyForCustomer(amount, currency)}`;
+  const expiryLine = quote.quoteExpiresAt ? `Valid until: ${formatUkDateTime(quote.quoteExpiresAt)}` : "Valid for 24 hours unless otherwise agreed.";
+  const outwardDateTime = formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime);
+  const returnLine = quote.returnJourney || quote.returnJourneyNeeded
+    ? `Return journey:\n${quote.returnPickup || "Not provided"} -> ${quote.returnDropoff || "Not provided"}\n${formatUkDateTimeFromParts(quote.returnDate, quote.returnTime)}`
+    : "Return journey: No";
   const cta = isGuest
-    ? "Reply to this email to accept or decline, or create an account using the same email to track your request."
-    : `Review and respond here: ${siteUrl}/account/quotes/${quote.id}`;
+    ? "Reply to this email, or create an account using the same email to track your request and payment."
+    : `${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: "Your NI Taxi Co quote is ready",
-    text: `Your quote is ready.\n${priceLine}\n${expiryLine}\n\n${journeySummary}\n\n${quote.adminCustomerMessage ? `Message from NI Taxi Co:\n${quote.adminCustomerMessage}\n\n` : ""}${cta}\n\nQuote reference: ${quote.id}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
+    text: `Your NI Taxi Co quote is ready.\n\n${priceLine}\n${expiryLine}\n\nJourney:\n${quote.pickupLocation} -> ${quote.dropoffLocation}\n\nDate/time:\n${outwardDateTime}\n\n${returnLine}\n\n${quote.adminCustomerMessage ? `Message from NI Taxi Co:\n${quote.adminCustomerMessage}\n\n` : ""}${isGuest ? `${cta}\n\n` : `Please review and make payment here:\n${cta}\n\n`}Quote reference:\n${quote.id}\n\n${emailFooter()}\n\n${accountDeliveryFooter()}`,
   };
 }
 
@@ -116,7 +138,7 @@ export function customerBookingConfirmedEmail(quote: QuoteRecord, isGuest: boole
   const track = isGuest ? "Reply to this email for any changes." : `View booking quote details: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Booking confirmed (${quote.id})`,
-    text: `Your booking is confirmed.\n\nJourney summary:\n${quoteSummary(quote)}\n\nDriver details: To be shared before travel (placeholder).\n\n${track}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
+    text: `Your booking is confirmed.\n\nJourney summary:\n${quoteSummary(quote)}\n\nDriver details: To be shared before travel (placeholder).\n\n${track}\n\n${emailFooter()}\n\n${accountDeliveryFooter()}`,
   };
 }
 
@@ -133,7 +155,7 @@ export function customerPaymentConfirmedEmail(quote: QuoteRecord, isGuest: boole
   const track = isGuest ? "Reply to this email for any booking updates." : `View quote details: ${siteUrl}/account/quotes/${quote.id}`;
   return {
     subject: `Payment received (${quote.id})`,
-    text: `Thank you. We have received your payment.\n\nPaid amount: ${currency} ${amount}\nQuote reference: ${quote.id}\nJourney: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\nWe'll confirm final booking/driver details shortly.\n\n${track}\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
+    text: `Thank you. We have received your payment.\n\nPaid amount: ${formatCurrencyForCustomer(amount, currency)}\nQuote reference: ${quote.id}\nJourney: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/time: ${formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime)}\n\nWe'll confirm final booking/driver details shortly.\n\n${track}\n\n${emailFooter()}\n\n${accountDeliveryFooter()}`,
   };
 }
 
@@ -142,7 +164,7 @@ export function adminPaymentReceivedEmail(quote: QuoteRecord) {
   const currency = quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP";
   return {
     subject: `Payment received for NI Taxi Co quote (${quote.id})`,
-    text: `A customer payment has been received.\n\nQuote ID: ${quote.id}\nAmount: ${currency} ${amount}\nSquare payment ID: ${quote.squarePaymentId || "N/A"}\nRoute: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${quote.pickupDate} ${quote.pickupTime}\n\n${emailFooter()}`,
+    text: `A customer payment has been received.\n\nQuote ID: ${quote.id}\nAmount: ${currency} ${amount}\nSquare payment ID: ${quote.squarePaymentId || "N/A"}\nRoute: ${quote.pickupLocation} -> ${quote.dropoffLocation}\nDate/Time: ${formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime)}\n\n${emailFooter()}`,
   };
 }
 
@@ -150,12 +172,12 @@ export function customerDriverDetailsEmail(quote: QuoteRecord, recipientName?: s
   const displayName = recipientName || quote.guestName || "Customer";
   const journey = `${quote.pickupLocation} -> ${quote.dropoffLocation}`;
   const returnLine = quote.returnJourney || quote.returnJourneyNeeded
-    ? `Return: ${quote.returnPickup || "Not provided"} -> ${quote.returnDropoff || "Not provided"} (${quote.returnDate || "Not provided"} ${quote.returnTime || ""})`
-    : "Return: No";
+    ? `Return journey:\n${quote.returnPickup || "Not provided"} -> ${quote.returnDropoff || "Not provided"}\n${formatUkDateTimeFromParts(quote.returnDate, quote.returnTime)}`
+    : "Return journey: No";
   const driverPhoto = quote.assignedDriverPhotoUrl ? `Driver photo: ${quote.assignedDriverPhotoUrl}\n` : "";
   return {
     subject: "Your NI Taxi Co driver details",
-    text: `Hi ${displayName},\n\nYour driver details are now available.\n\nJourney:\n${journey}\nDate/time: ${quote.pickupDate} ${quote.pickupTime}\n${returnLine}\n\nDriver:\nName: ${quote.assignedDriverName || "Not provided"}\nPhone: ${quote.assignedDriverPhone || "Not provided"}\nCar: ${quote.assignedVehicleMake || "Not provided"}\nRegistration: ${quote.assignedVehicleRegistration || "Not provided"}\n${driverPhoto}\nPlease keep these details available for your journey.\n\n${accountDeliveryFooter()}\n\n${emailFooter()}`,
+    text: `Hi ${displayName},\n\nYour driver details are now available.\n\nJourney:\n${journey}\nDate/time: ${formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime)}\n${returnLine}\n\nDriver:\nName: ${quote.assignedDriverName || "Not provided"}\nPhone: ${quote.assignedDriverPhone || "Not provided"}\nCar: ${quote.assignedVehicleMake || "Not provided"}\nRegistration: ${quote.assignedVehicleRegistration || "Not provided"}\n${driverPhoto}\nPlease keep these details available for your journey.\n\n${emailFooter()}\n\n${accountDeliveryFooter()}`,
   };
 }
 
@@ -175,7 +197,7 @@ export function driverJobDetailsEmail(quote: QuoteRecord) {
     : "Return journey: No";
   return {
     subject: "NI Taxi Co job details",
-    text: `Job details:\n\nPickup date/time: ${quote.pickupDate} ${quote.pickupTime}\nPickup: ${quote.pickupLocation}\nDrop-off: ${quote.dropoffLocation}\nOutward flight number: ${quote.outwardFlightNumber || "Not provided"}\n${returnLine}\n\nCustomer/booker: ${customerName}\nCustomer phone: ${customerPhone}\n${leadPassengerLine}\nPassengers: ${quote.passengers}\nLuggage: ${luggage}\nSpecial requests: ${quote.itineraryMessage || "Not provided"}\nAdmin notes: ${quote.adminNotes || "Not provided"}\n\n${emailFooter()}`,
+    text: `Job details:\n\nPickup date/time: ${formatUkDateTimeFromParts(quote.pickupDate, quote.pickupTime)}\nPickup: ${quote.pickupLocation}\nDrop-off: ${quote.dropoffLocation}\nOutward flight number: ${quote.outwardFlightNumber || "Not provided"}\n${returnLine}\n\nCustomer/booker: ${customerName}\nCustomer phone: ${customerPhone}\n${leadPassengerLine}\nPassengers: ${quote.passengers}\nLuggage: ${luggage}\nSpecial requests: ${quote.itineraryMessage || "Not provided"}\nAdmin notes: ${quote.adminNotes || "Not provided"}\n\n${emailFooter()}`,
   };
 }
 
