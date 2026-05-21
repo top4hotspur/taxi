@@ -140,6 +140,15 @@ export interface QuoteRecord {
   customerEmailErrorMessage?: string;
   customerEmailProviderStatus?: string;
   customerEmailProviderMessageId?: string;
+  quoteReadyEmailAttempted?: boolean;
+  quoteReadyEmailStatus?: "SENT" | "FAILED" | "SKIPPED";
+  quoteReadyEmailRecipient?: string;
+  quoteReadyEmailProvider?: "RESEND";
+  quoteReadyEmailProviderMessageId?: string;
+  quoteReadyEmailProviderStatus?: string;
+  quoteReadyEmailErrorCode?: string;
+  quoteReadyEmailErrorMessage?: string;
+  quoteReadyEmailSentAt?: string;
   customerDriverSmsSentAt?: string;
   customerWhatsAppSentAt?: string;
   customerWhatsAppAttemptedAt?: string;

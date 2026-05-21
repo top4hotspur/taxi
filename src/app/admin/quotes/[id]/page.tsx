@@ -39,6 +39,15 @@ type Quote = {
   customerEmailErrorMessage?: string;
   customerEmailProviderStatus?: string;
   customerEmailProviderMessageId?: string;
+  quoteReadyEmailAttempted?: boolean;
+  quoteReadyEmailStatus?: "SENT" | "FAILED" | "SKIPPED";
+  quoteReadyEmailRecipient?: string;
+  quoteReadyEmailProvider?: "RESEND";
+  quoteReadyEmailProviderMessageId?: string;
+  quoteReadyEmailProviderStatus?: string;
+  quoteReadyEmailErrorCode?: string;
+  quoteReadyEmailErrorMessage?: string;
+  quoteReadyEmailSentAt?: string;
   customerDriverSmsSentAt?: string;
   customerWhatsAppSentAt?: string;
   customerWhatsAppStatus?: "SENT" | "QUEUED" | "DELIVERED" | "SKIPPED" | "SKIPPED_NO_CUSTOMER_PHONE" | "FAILED";
@@ -207,6 +216,16 @@ export default function AdminQuoteDetailPage() {
       detailMessages: string[];
     };
   } | null>(null);
+  const [quoteReadyEmailFeedback, setQuoteReadyEmailFeedback] = useState<{
+    status: "SENT" | "FAILED" | "SKIPPED" | "NOT_SENT";
+    recipient?: string | null;
+    provider?: string | null;
+    providerMessageId?: string | null;
+    providerStatus?: string | null;
+    errorCode?: string | null;
+    errorMessage?: string | null;
+    sentAt?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     const id = params.id;
@@ -250,6 +269,7 @@ export default function AdminQuoteDetailPage() {
     setError("");
     setBanner(null);
     setNotifyResult(null);
+    setQuoteReadyEmailFeedback(null);
     const fd = new FormData(event.currentTarget);
     const payload = {
       adminNotes: fd.get("adminNotes"),
@@ -274,10 +294,23 @@ export default function AdminQuoteDetailPage() {
         return;
       }
       setQuote(data.quote);
-      if (data.emailAttempted && data.emailSent) {
-        setBanner({ tone: "success", message: "Quote updated and sent to the customer." });
-      } else if (data.emailAttempted && !data.emailSent) {
+      const emailStatus = String(data.quoteReadyEmailStatus || "NOT_SENT") as "SENT" | "FAILED" | "SKIPPED" | "NOT_SENT";
+      setQuoteReadyEmailFeedback({
+        status: emailStatus,
+        recipient: data.quoteReadyEmailRecipient || null,
+        provider: data.quoteReadyEmailProvider || null,
+        providerMessageId: data.quoteReadyEmailProviderMessageId || null,
+        providerStatus: data.quoteReadyEmailProviderStatus || null,
+        errorCode: data.quoteReadyEmailErrorCode || null,
+        errorMessage: data.quoteReadyEmailErrorMessage || null,
+        sentAt: data.quoteReadyEmailSentAt || null,
+      });
+      if (emailStatus === "SENT") {
+        setBanner({ tone: "success", message: "Quote updated and customer email sent." });
+      } else if (emailStatus === "FAILED") {
         setBanner({ tone: "warning", message: "Quote updated, but customer email could not be sent." });
+      } else if (emailStatus === "SKIPPED") {
+        setBanner({ tone: "warning", message: "Quote updated. No customer email was sent." });
       } else {
         setBanner({ tone: "success", message: "Quote updated." });
       }
@@ -442,6 +475,16 @@ export default function AdminQuoteDetailPage() {
       {banner ? (
         <div className={`rounded-xl border px-4 py-3 text-sm ${banner.tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : banner.tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-900"}`}>
           {banner.message}
+          {quoteReadyEmailFeedback && quoteReadyEmailFeedback.status !== "NOT_SENT" ? (
+            <div className="mt-2 space-y-1 text-xs">
+              {quoteReadyEmailFeedback.recipient ? <p>To: {quoteReadyEmailFeedback.recipient}</p> : null}
+              {quoteReadyEmailFeedback.providerMessageId ? <p>Resend message ID: <code className="select-all rounded bg-white/60 px-1 py-0.5">{quoteReadyEmailFeedback.providerMessageId}</code></p> : null}
+              {quoteReadyEmailFeedback.providerStatus ? <p>Provider status: {quoteReadyEmailFeedback.providerStatus === "accepted" ? "Accepted by Resend" : quoteReadyEmailFeedback.providerStatus}</p> : null}
+              {quoteReadyEmailFeedback.errorCode || quoteReadyEmailFeedback.errorMessage ? (
+                <p>Error: {[quoteReadyEmailFeedback.errorCode, quoteReadyEmailFeedback.errorMessage].filter(Boolean).join(" - ")}</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -522,6 +565,21 @@ export default function AdminQuoteDetailPage() {
           {quote.paymentAmount !== undefined ? fieldRow("Payment amount", formatMoney(quote.paymentAmount, quote.paymentCurrency || currency)) : null}
           {quote.squarePaymentId ? fieldRow("Square payment ID", quote.squarePaymentId) : null}
           {quote.paymentStatus === "PAYMENT_FAILED" && quote.paymentFailureReason ? fieldRow("Failure reason", quote.paymentFailureReason) : null}
+        </>)}
+
+        {sectionCard("Quote-ready email", <>
+          {fieldRow("Status", quote.quoteReadyEmailStatus || "Not sent")}
+          {fieldRow("Recipient", quote.quoteReadyEmailRecipient || "Not provided")}
+          {quote.quoteReadyEmailSentAt ? fieldRow("Sent at", formatUkDateTime(quote.quoteReadyEmailSentAt)) : null}
+          {quote.quoteReadyEmailProvider ? fieldRow("Provider", quote.quoteReadyEmailProvider) : null}
+          {quote.quoteReadyEmailProviderStatus ? fieldRow("Provider status", quote.quoteReadyEmailProviderStatus === "accepted" ? "Accepted by Resend" : quote.quoteReadyEmailProviderStatus) : null}
+          {quote.quoteReadyEmailProviderMessageId ? (
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+              <p className="text-slate-500">Resend message ID</p>
+              <p className="sm:col-span-2 font-medium text-slate-900"><code className="select-all rounded bg-slate-100 px-1 py-0.5">{quote.quoteReadyEmailProviderMessageId}</code></p>
+            </div>
+          ) : null}
+          {(quote.quoteReadyEmailErrorCode || quote.quoteReadyEmailErrorMessage) ? fieldRow("Error", `${quote.quoteReadyEmailErrorCode || ""} ${quote.quoteReadyEmailErrorMessage || ""}`.trim()) : null}
         </>)}
 
         {sectionCard("Driver assignment", <>

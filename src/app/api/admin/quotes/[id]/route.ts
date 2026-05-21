@@ -96,9 +96,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const customer = updated?.customerId ? await db.findUserById(updated.customerId) : null;
   const customerProfile = updated?.customerId ? await db.getCustomerProfileByUserId(updated.customerId) : null;
 
-  let emailAttempted = false;
-  let emailSent = false;
-  let emailError: string | null = null;
+  let quoteReadyEmailAttempted = false;
+  let quoteReadyEmailStatus: "SENT" | "FAILED" | "SKIPPED" | "NOT_SENT" = "NOT_SENT";
+  let quoteReadyEmailRecipient: string | null = null;
+  let quoteReadyEmailProvider: string | null = null;
+  let quoteReadyEmailProviderMessageId: string | null = null;
+  let quoteReadyEmailProviderStatus: string | null = null;
+  let quoteReadyEmailErrorCode: string | null = null;
+  let quoteReadyEmailErrorMessage: string | null = null;
+  let quoteReadyEmailSentAt: string | null = null;
 
   const becameActionable = Boolean(
     updated &&
@@ -110,26 +116,84 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   if (updated && becameActionable) {
     const recipientEmail = (updated.guestEmail || customer?.email || "").trim();
-    if (recipientEmail) {
-      emailAttempted = true;
+    quoteReadyEmailAttempted = true;
+    quoteReadyEmailRecipient = recipientEmail || null;
+    if (!recipientEmail) {
+      quoteReadyEmailStatus = "SKIPPED";
+      quoteReadyEmailErrorCode = "EMAIL_RECIPIENT_MISSING";
+      quoteReadyEmailErrorMessage = "Recipient email is missing.";
+    } else {
       try {
         const template = customerQuoteSentEmail(updated, Boolean(updated.guestEmail));
         const result = await sendEmail({ to: recipientEmail, subject: template.subject, text: template.text });
-        emailSent = Boolean(result.ok);
-        emailError = result.ok ? null : (result.error || "Email send failed");
+        quoteReadyEmailProvider = result.provider?.toUpperCase() || "RESEND";
+        quoteReadyEmailProviderMessageId = result.providerMessageId || null;
+        quoteReadyEmailProviderStatus = result.providerStatus || null;
+        if (result.ok) {
+          quoteReadyEmailStatus = "SENT";
+          quoteReadyEmailSentAt = new Date().toISOString();
+        } else if (result.skipped) {
+          quoteReadyEmailStatus = "SKIPPED";
+          quoteReadyEmailErrorCode = result.errorCode || "EMAIL_NOT_CONFIGURED";
+          quoteReadyEmailErrorMessage = result.error || result.providerErrorMessage || "Email was skipped.";
+        } else {
+          quoteReadyEmailStatus = "FAILED";
+          quoteReadyEmailErrorCode = result.errorCode || result.resendErrorCode || "EMAIL_SEND_FAILED";
+          quoteReadyEmailErrorMessage = result.error || result.providerErrorMessage || "Email send failed.";
+        }
       } catch (error) {
-        emailSent = false;
-        emailError = error instanceof Error ? error.message : "Email send failed";
+        quoteReadyEmailStatus = "FAILED";
+        quoteReadyEmailErrorCode = "EMAIL_SEND_FAILED";
+        quoteReadyEmailErrorMessage = error instanceof Error ? error.message : "Email send failed";
       }
+    }
+
+    const refreshed = await db.updateQuote(id, {
+      quoteReadyEmailAttempted,
+      quoteReadyEmailStatus,
+      quoteReadyEmailRecipient: quoteReadyEmailRecipient || undefined,
+      quoteReadyEmailProvider: quoteReadyEmailProvider === "RESEND" ? "RESEND" : undefined,
+      quoteReadyEmailProviderMessageId: quoteReadyEmailProviderMessageId || undefined,
+      quoteReadyEmailProviderStatus: quoteReadyEmailProviderStatus || undefined,
+      quoteReadyEmailErrorCode: quoteReadyEmailErrorCode || undefined,
+      quoteReadyEmailErrorMessage: quoteReadyEmailErrorMessage || undefined,
+      quoteReadyEmailSentAt: quoteReadyEmailSentAt || undefined,
+    });
+    if (refreshed) {
+      const attemptedAt = new Date().toISOString();
+      await db.createAudit({
+        quoteId: id,
+        changedByRole: "admin",
+        changedByUserId: user?.userId,
+        previousStatus: normalizedNextStatus,
+        newStatus: "QUOTE_READY_EMAIL_ATTEMPTED",
+        note: JSON.stringify({
+          recipient: quoteReadyEmailRecipient,
+          status: quoteReadyEmailStatus,
+          provider: quoteReadyEmailProvider || "RESEND",
+          providerMessageId: quoteReadyEmailProviderMessageId,
+          providerStatus: quoteReadyEmailProviderStatus,
+          errorCode: quoteReadyEmailErrorCode,
+          errorMessage: quoteReadyEmailErrorMessage,
+          attemptedAt,
+        }),
+      });
+      Object.assign(updated, refreshed);
     }
   }
 
   return NextResponse.json({
     success: true,
     quote: updated ? { ...updated, customerEmail: customer?.email || null, customerProfileName: customerProfile?.name || null } : updated,
-    emailAttempted,
-    emailSent,
-    emailError,
+    quoteReadyEmailAttempted,
+    quoteReadyEmailStatus,
+    quoteReadyEmailRecipient,
+    quoteReadyEmailProvider: quoteReadyEmailProvider || "RESEND",
+    quoteReadyEmailProviderMessageId,
+    quoteReadyEmailProviderStatus,
+    quoteReadyEmailErrorCode,
+    quoteReadyEmailErrorMessage,
+    quoteReadyEmailSentAt,
   });
 }
 
