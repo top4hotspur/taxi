@@ -7,6 +7,10 @@ import { createQuote } from "@/lib/quote/service";
 
 const required = ["serviceType", "pickupLocation", "dropoffLocation", "pickupDate", "pickupTime", "passengers"] as const;
 
+function hasUsablePhone(value: string) {
+  return value.trim().replace(/[^\d+]/g, "").length >= 7;
+}
+
 export async function POST(request: Request) {
   const correlationId = crypto.randomUUID();
   let quoteSaved = false;
@@ -34,6 +38,12 @@ export async function POST(request: Request) {
     }
 
     const requiredFields: string[] = [...required];
+    const returnJourneyRequested =
+      String(payload.returnJourneyNeeded || "").toLowerCase() === "true" ||
+      String(payload.returnJourney || "no").toLowerCase() === "yes";
+    if (returnJourneyRequested) {
+      requiredFields.push("returnPickup", "returnDropoff", "returnDate", "returnTime");
+    }
 
     for (const field of requiredFields) {
       if (typeof payload[field] !== "string" || !String(payload[field]).trim()) {
@@ -53,6 +63,9 @@ export async function POST(request: Request) {
     }
 
     const passengers = Number(payload.passengers);
+    const bookerName = String(payload.name || "").trim();
+    const bookerEmail = String(session.email || payload.email || "").trim();
+    const bookerPhone = String(payload.phone || "").trim();
     const handLuggageCount = Number(payload.handLuggageCount || 0);
     const suitcaseCount = Number(payload.suitcaseCount || 0);
     const oversizeItemCount = Number(payload.oversizeItemCount || 0);
@@ -87,6 +100,48 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (!bookerName) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_FAILED",
+          error: "Please enter your name.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 400 }
+      );
+    }
+    if (!bookerEmail) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_FAILED",
+          error: "Please enter your email address.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 400 }
+      );
+    }
+    if (!hasUsablePhone(bookerPhone)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_FAILED",
+          error: "Please enter your phone number so we can contact you about your booking.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 400 }
+      );
+    }
     const termsAccepted = String(payload.termsAccepted || "").toLowerCase() === "true";
     if (!termsAccepted) {
       return NextResponse.json(
@@ -103,13 +158,41 @@ export async function POST(request: Request) {
       );
     }
     const leadPassengerSameAsBooker = String(payload.leadPassengerSameAsBooker || "true").toLowerCase() !== "false";
+    if (!leadPassengerSameAsBooker && !String(payload.leadPassengerName || "").trim()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_FAILED",
+          error: "Please enter the lead passenger name.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 400 }
+      );
+    }
+    if (!leadPassengerSameAsBooker && !hasUsablePhone(String(payload.leadPassengerPhone || ""))) {
+      return NextResponse.json(
+        {
+          ok: false,
+          errorCode: "VALIDATION_FAILED",
+          error: "Please enter the lead passenger phone number.",
+          correlationId,
+          quoteSaved,
+          emailAttempted,
+          emailSkipped,
+        },
+        { status: 400 }
+      );
+    }
 
     const result = await createQuote({
       correlationId,
       customerId: session.userId,
       guestEmail: undefined,
-      guestName: undefined,
-      guestPhone: undefined,
+      guestName: bookerName,
+      guestPhone: bookerPhone,
       passengerName: String(payload.passengerName || "") || undefined,
       passengerPhone: String(payload.passengerPhone || "") || undefined,
       leadPassengerSameAsBooker,

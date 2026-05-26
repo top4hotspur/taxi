@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import PlaceAutocompleteInput from "@/components/PlaceAutocompleteInput";
 import { trackAnalyticsEvent } from "@/lib/analytics/client";
@@ -56,6 +56,24 @@ function isAirportLocation(value: string) {
   return value.toLowerCase().includes("airport");
 }
 
+function trimmed(value: string | undefined) {
+  return String(value || "").trim();
+}
+
+function phoneLooksUsable(value: string | undefined) {
+  const compact = trimmed(value).replace(/[^\d+]/g, "");
+  return compact.length >= 7;
+}
+
+function formatEstimateMoney(value: number | null | undefined, currency = "GBP") {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  try {
+    return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(value);
+  } catch {
+    return `£${value.toFixed(2)}`;
+  }
+}
+
 export default function QuoteForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -71,6 +89,8 @@ export default function QuoteForm() {
   const [formState, setFormState] = useState<Record<string, string>>(initialDraft);
   const [customerContext, setCustomerContext] = useState({ loggedInCustomer: false, email: "", name: "", phone: "" });
   const [showLoginRequired, setShowLoginRequired] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     trackAnalyticsEvent("QUOTE_STARTED", "/quote");
@@ -97,6 +117,13 @@ export default function QuoteForm() {
     if (!returnJourneyNeeded) return true;
     return Boolean((formState.returnPickupLocation || "").trim() && (formState.returnDropoffLocation || "").trim() && (formState.returnDate || "").trim() && (formState.returnTime || "").trim());
   })();
+
+  const effectiveBookerName = customerContext.loggedInCustomer ? customerContext.name || formState.name : formState.name;
+  const effectiveBookerEmail = customerContext.loggedInCustomer ? customerContext.email || formState.email : formState.email;
+  const effectiveBookerPhone = customerContext.loggedInCustomer ? customerContext.phone || formState.phone : formState.phone;
+  const bookerDetailsComplete = Boolean(trimmed(effectiveBookerName) && trimmed(effectiveBookerEmail) && phoneLooksUsable(effectiveBookerPhone));
+  const leadPassengerComplete = leadPassengerSameAsBooker || Boolean(trimmed(formState.leadPassengerName) && phoneLooksUsable(formState.leadPassengerPhone));
+  const submitReady = customerContext.loggedInCustomer && bookerDetailsComplete && leadPassengerComplete && canCalculate && termsAccepted;
 
   function markPotentiallyStale(fieldName: string) {
     if (!estimate || !pricingRelevantFields.has(fieldName)) return;
@@ -147,10 +174,11 @@ export default function QuoteForm() {
     markPotentiallyStale(params.locationField);
   }
 
-  async function calculateEstimate() {
+  const calculateEstimate = useCallback(async (source: "auto" | "manual" = "manual") => {
     if (!formRef.current) return;
     setEstimating(true);
     setEstimateError("");
+    if (source === "auto") trackAnalyticsEvent("QUOTE_AUTO_ESTIMATE_STARTED", "/quote");
     const fd = new FormData(formRef.current);
     const payload = {
       pickupLocation: String(fd.get("pickupLocation") || ""),
@@ -186,21 +214,67 @@ export default function QuoteForm() {
       setEstimate(result);
       setEstimateStale(false);
       trackAnalyticsEvent("QUOTE_ESTIMATE_RECALCULATED", "/quote");
+      trackAnalyticsEvent("QUOTE_ESTIMATE_CALCULATED", "/quote");
       if (result.manualGroupQuote) {
         setEstimateError(result.customerMessage || "We can't estimate prices online for groups larger than 8 passengers. Please submit your request and we'll be in touch shortly with a tailored quote.");
+        if (source === "auto") trackAnalyticsEvent("QUOTE_AUTO_ESTIMATE_FAILED", "/quote");
       } else if (result.routeEstimateFailed) {
         setEstimateError(result.customerMessage || "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.");
+        if (source === "auto") trackAnalyticsEvent("QUOTE_AUTO_ESTIMATE_FAILED", "/quote");
+      } else if (source === "auto") {
+        trackAnalyticsEvent("QUOTE_AUTO_ESTIMATE_SUCCEEDED", "/quote");
       }
     } catch {
-      setEstimateError("Unable to calculate estimate right now.");
+      setEstimateError("We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.");
       setEstimate(null);
+      if (source === "auto") trackAnalyticsEvent("QUOTE_AUTO_ESTIMATE_FAILED", "/quote");
     } finally {
       setEstimating(false);
     }
-  }
+  }, [returnJourneyNeeded]);
+
+  useEffect(() => {
+    if (!canCalculate) return;
+    const timer = window.setTimeout(() => {
+      void calculateEstimate("auto");
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [
+    canCalculate,
+    returnJourneyNeeded,
+    formState.pickupLocation,
+    formState.pickupPlaceId,
+    formState.pickupLat,
+    formState.pickupLng,
+    formState.dropoffLocation,
+    formState.dropoffPlaceId,
+    formState.dropoffLat,
+    formState.dropoffLng,
+    formState.pickupDate,
+    formState.pickupTime,
+    formState.returnPickupLocation,
+    formState.returnPickupPlaceId,
+    formState.returnPickupLat,
+    formState.returnPickupLng,
+    formState.returnDropoffLocation,
+    formState.returnDropoffPlaceId,
+    formState.returnDropoffLat,
+    formState.returnDropoffLng,
+    formState.returnDate,
+    formState.returnTime,
+    formState.passengers,
+    formState.handLuggageCount,
+    formState.suitcaseCount,
+    formState.oversizeItemCount,
+    formState.serviceType,
+    formState.accountType,
+    formState.itineraryMessage,
+    calculateEstimate,
+  ]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setValidationMessage("");
     if (!customerContext.loggedInCustomer) {
       const fd = new FormData(event.currentTarget);
       const draft = Object.fromEntries(Array.from(fd.entries()).map(([key, value]) => [key, String(value)]));
@@ -209,6 +283,32 @@ export default function QuoteForm() {
       setStatus("error");
       setMessage("Please create an account or sign in before submitting your quote so you can view, accept and pay for it later.");
       trackAnalyticsEvent("QUOTE_LOGIN_REQUIRED_SHOWN", "/quote");
+      return;
+    }
+
+    if (!trimmed(effectiveBookerName)) {
+      setValidationMessage("Please enter your name.");
+      trackAnalyticsEvent("QUOTE_VALIDATION_FAILED", "/quote");
+      return;
+    }
+    if (!phoneLooksUsable(effectiveBookerPhone)) {
+      setValidationMessage("Please enter your phone number so we can contact you about your booking.");
+      trackAnalyticsEvent("QUOTE_VALIDATION_FAILED", "/quote");
+      return;
+    }
+    if (!leadPassengerSameAsBooker && !trimmed(formState.leadPassengerName)) {
+      setValidationMessage("Please enter the lead passenger name.");
+      trackAnalyticsEvent("QUOTE_VALIDATION_FAILED", "/quote");
+      return;
+    }
+    if (!leadPassengerSameAsBooker && !phoneLooksUsable(formState.leadPassengerPhone)) {
+      setValidationMessage("Please enter the lead passenger phone number.");
+      trackAnalyticsEvent("QUOTE_VALIDATION_FAILED", "/quote");
+      return;
+    }
+    if (!termsAccepted) {
+      setValidationMessage("Please accept the Terms & Conditions and Policies before submitting.");
+      trackAnalyticsEvent("QUOTE_VALIDATION_FAILED", "/quote");
       return;
     }
 
@@ -269,11 +369,11 @@ export default function QuoteForm() {
       estimatedDistanceMiles: estimate?.distanceMiles,
       estimatedDurationMinutes: estimate?.durationMinutes,
       estimatedFareBreakdown: estimate?.fareBreakdown ? JSON.stringify(estimate.fareBreakdown) : "",
-      pricingSource: estimate?.pricingSource || "",
-      requiresManualReview: Boolean(estimate?.requiresManualReview || estimateStale),
+      pricingSource: estimate?.pricingSource || (estimateError ? "FALLBACK_MANUAL_REVIEW" : ""),
+      requiresManualReview: Boolean(estimate?.requiresManualReview || estimateStale || estimateError),
       pricingCalculatedAt: estimate ? new Date().toISOString() : "",
-      routeEstimateFailed: Boolean(estimate?.routeEstimateFailed || estimateStale),
-      routeEstimateFailureReason: String(estimateStale ? "Journey details changed after estimate." : estimate?.routeEstimateFailureReason || ""),
+      routeEstimateFailed: Boolean(estimate?.routeEstimateFailed || estimateStale || estimateError),
+      routeEstimateFailureReason: String(estimateStale ? "Journey details changed after estimate." : estimate?.routeEstimateFailureReason || estimateError || ""),
       outwardFlightNumber: outwardAirportPickup ? String(fd.get("outwardFlightNumber") || "") : "",
       returnFlightNumber: returnAirportPickup ? String(fd.get("returnFlightNumber") || "") : "",
       termsAccepted: String(fd.get("termsAccepted") || "").toLowerCase() === "true",
@@ -308,6 +408,7 @@ export default function QuoteForm() {
         if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
         if (target.name === "returnJourney") setReturnJourneyNeeded(target.value === "Yes");
         if (target.name === "leadPassengerSameAsBooker") setLeadPassengerSameAsBooker(target.value === "Yes");
+        if (target.name === "termsAccepted" && target instanceof HTMLInputElement) setTermsAccepted(target.checked);
         if (target.name) {
           markPotentiallyStale(target.name);
           setFormState((current) => ({ ...current, [target.name]: target.value }));
@@ -525,7 +626,7 @@ export default function QuoteForm() {
           {!leadPassengerSameAsBooker ? (
             <>
               <InputField label="Lead passenger name" name="leadPassengerName" required defaultValue={formState.leadPassengerName || ""} />
-              <InputField label="Lead passenger email address" name="leadPassengerEmail" type="email" required defaultValue={formState.leadPassengerEmail || ""} />
+              <InputField label="Lead passenger email address" name="leadPassengerEmail" type="email" defaultValue={formState.leadPassengerEmail || ""} />
               <InputField label="Lead passenger phone number" name="leadPassengerPhone" required defaultValue={formState.leadPassengerPhone || ""} />
             </>
           ) : null}
@@ -542,34 +643,41 @@ export default function QuoteForm() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">Estimate</h2>
-        <button type="button" onClick={calculateEstimate} disabled={estimating || !canCalculate} className="rounded-full border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60">
-          {estimating ? "Calculating..." : "Calculate estimated price"}
-        </button>
+        {!canCalculate ? <p className="text-sm text-slate-600">Enter your journey details and we&apos;ll estimate the price automatically.</p> : null}
+        {estimating ? <p className="text-sm font-medium text-slate-700">Calculating estimate...</p> : null}
         {estimateStale && <p className="text-sm font-medium text-amber-700">Journey details changed. Please recalculate before submitting.</p>}
-        {estimateError && <p className="text-sm text-red-700">{estimateError}</p>}
-        {estimate?.ok && (
+        {canCalculate && estimateError ? (
+          <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Manual quote required</p>
+            <p>{estimateError}</p>
+          </article>
+        ) : null}
+        {canCalculate && estimate?.ok && !estimate.manualGroupQuote && !estimate.routeEstimateFailed && (estimate.finalEstimatedFare ?? estimate.estimatedFare) !== null && !estimateError ? (
           <article className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-slate-900">
-            {estimate.manualGroupQuote ? (
-              <p className="font-medium text-amber-900">We can&apos;t estimate prices online for groups larger than 8 passengers. Please submit your request and we&apos;ll be in touch shortly with a tailored quote.</p>
-            ) : returnJourneyNeeded ? (
+            {returnJourneyNeeded ? (
               <>
-                <p className="text-lg font-semibold">Estimated return fare: {estimate.finalEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
-                <p>Outward journey: {estimate.outwardEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
-                <p>Return journey: {estimate.returnEstimatedFare ?? "N/A"} {estimate.currency || ""}</p>
-                <p>Return booking discount 10%: -{estimate.returnDiscountAmount ?? "N/A"} {estimate.currency || ""}</p>
+                <p className="text-lg font-semibold">Estimated return fare: {formatEstimateMoney(estimate.finalEstimatedFare, estimate.currency)}</p>
+                <p>Outward journey: {formatEstimateMoney(estimate.outwardEstimatedFare, estimate.currency)}</p>
+                <p>Return journey: {formatEstimateMoney(estimate.returnEstimatedFare, estimate.currency)}</p>
+                <p>Return booking discount 10%: -{formatEstimateMoney(estimate.returnDiscountAmount, estimate.currency)}</p>
               </>
             ) : (
               <>
-                <p className="text-lg font-semibold">Estimated fare: {estimate.finalEstimatedFare ?? estimate.estimatedFare ?? "N/A"} {estimate.currency || ""}</p>
-                <p>Distance: {estimate.distanceMiles ?? "N/A"} {estimate.distanceMiles !== null && estimate.distanceMiles !== undefined ? "miles" : ""}</p>
-                <p>Journey time: {estimate.durationMinutes ?? "N/A"} {estimate.durationMinutes !== null && estimate.durationMinutes !== undefined ? "minutes" : ""}</p>
+                <p className="text-lg font-semibold">Estimated fare: {formatEstimateMoney(estimate.finalEstimatedFare ?? estimate.estimatedFare, estimate.currency)}</p>
+                {estimate.distanceMiles !== null && estimate.distanceMiles !== undefined ? <p>Distance: {estimate.distanceMiles} miles</p> : null}
+                {estimate.durationMinutes !== null && estimate.durationMinutes !== undefined ? <p>Journey time: {estimate.durationMinutes} minutes</p> : null}
                 <p>{estimate.fareBreakdown?.["airportSurchargeApplied"] ? "Airport surcharge included." : ""}</p>
                 <p>{estimate.fareBreakdown?.["passengerUpliftPercent"] ? "Passenger uplift included." : ""}</p>
               </>
             )}
             <p className="mt-2 text-slate-700">Subject to driver availability and final confirmation.</p>
           </article>
-        )}
+        ) : null}
+        {canCalculate ? (
+          <button type="button" onClick={() => calculateEstimate("manual")} disabled={estimating} className="text-xs font-semibold text-slate-600 underline underline-offset-4 disabled:opacity-60">
+            Recalculate estimate
+          </button>
+        ) : null}
       </section>
 
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -581,9 +689,10 @@ export default function QuoteForm() {
         </label>
       </section>
 
-      <button type="submit" disabled={status === "loading"} className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500">
+      <button type="submit" disabled={status === "loading" || !submitReady} className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-500">
         {status === "loading" ? "Submitting..." : "Submit Quote Request"}
       </button>
+      {validationMessage ? <p className="text-sm text-red-700">{validationMessage}</p> : null}
       {customerContext.loggedInCustomer ? (
         <p className="text-sm text-slate-600">
           We&apos;ll email quote updates to your account email address. Please check your junk/spam folder if an email doesn&apos;t arrive. We may also send key updates by WhatsApp where available.

@@ -21,7 +21,11 @@ export type AnalyticsEventType =
   | "QUOTE_LOGIN_REQUIRED_SHOWN"
   | "QUOTE_REGISTER_CLICKED"
   | "QUOTE_SIGNIN_CLICKED"
-  | "QUOTE_SUBMITTED_AUTHENTICATED";
+  | "QUOTE_SUBMITTED_AUTHENTICATED"
+  | "QUOTE_AUTO_ESTIMATE_STARTED"
+  | "QUOTE_AUTO_ESTIMATE_SUCCEEDED"
+  | "QUOTE_AUTO_ESTIMATE_FAILED"
+  | "QUOTE_VALIDATION_FAILED";
 
 function getOrCreateLocalStorageValue(key: string) {
   const existing = window.localStorage.getItem(key);

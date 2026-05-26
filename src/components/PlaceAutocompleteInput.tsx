@@ -195,6 +195,7 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
       if (place.name && input && !input.value.trim()) {
         input.value = place.name;
       }
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }, [scriptReady]);
 
