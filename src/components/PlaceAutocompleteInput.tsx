@@ -32,6 +32,7 @@ declare global {
 
 const SCRIPT_ID = "google-maps-places-script";
 const COMPONENT_NAME = "PlaceAutocompleteInput";
+const CLEAR_EVENT = "ni-taxi-place-autocomplete-clear";
 
 type DiagnosticReason =
   | "API_KEY_MISSING"
@@ -107,6 +108,22 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
   const [diagReason, setDiagReason] = useState<DiagnosticReason>(apiKey ? null : "API_KEY_MISSING");
   const [diagDetail, setDiagDetail] = useState<string | null>(apiKey ? null : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is missing.");
   const isDebugMode = process.env.NODE_ENV !== "production";
+
+  useEffect(() => {
+    const clearStructuredPlace = (event: Event) => {
+      const detail = (event as CustomEvent<{ fieldName?: string }>).detail;
+      if (detail?.fieldName !== props.locationNameField) return;
+      setSelectedPlaceId("");
+      setSelectedAddress("");
+      setSelectedLat("");
+      setSelectedLng("");
+    };
+
+    window.addEventListener(CLEAR_EVENT, clearStructuredPlace);
+    return () => {
+      window.removeEventListener(CLEAR_EVENT, clearStructuredPlace);
+    };
+  }, [props.locationNameField]);
 
   useEffect(() => {
     const onWindowError = (event: ErrorEvent) => {

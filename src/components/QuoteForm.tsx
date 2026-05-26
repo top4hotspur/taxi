@@ -12,6 +12,7 @@ const quickLocations = [
   { label: "City Airport - BHD", value: "Belfast City Airport, Sydenham By-Pass, Belfast, UK" },
   { label: "Grand Central Station", value: "Belfast BT12 5AP, UK" },
 ];
+const PLACE_CLEAR_EVENT = "ni-taxi-place-autocomplete-clear";
 const pricingRelevantFields = new Set([
   "pickupLocation", "dropoffLocation", "pickupDate", "pickupTime", "passengers", "returnJourney",
   "returnPickupLocation", "returnDropoffLocation", "returnDate", "returnTime", "handLuggageCount", "suitcaseCount", "oversizeItemCount", "serviceType",
@@ -147,7 +148,11 @@ export default function QuoteForm() {
   function setFieldValue(name: string, value: string) {
     if (!formRef.current) return;
     const input = formRef.current.querySelector<HTMLInputElement>(`[name="${name}"]`);
-    if (input) input.value = value;
+    if (input) {
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   }
 
   function applyQuickLocation(params: {
@@ -163,6 +168,7 @@ export default function QuoteForm() {
     setFieldValue(params.addressField, "");
     setFieldValue(params.latField, "");
     setFieldValue(params.lngField, "");
+    window.dispatchEvent(new CustomEvent(PLACE_CLEAR_EVENT, { detail: { fieldName: params.locationField } }));
     setFormState((current) => ({
       ...current,
       [params.locationField]: params.value,
@@ -172,6 +178,50 @@ export default function QuoteForm() {
       [params.lngField]: "",
     }));
     markPotentiallyStale(params.locationField);
+  }
+
+  function renderQuickSelectButtons({
+    fieldLabel,
+    locationField,
+    placeIdField,
+    addressField,
+    latField,
+    lngField,
+  }: {
+    fieldLabel: string;
+    locationField: string;
+    placeIdField: string;
+    addressField: string;
+    latField: string;
+    lngField: string;
+  }) {
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-slate-500">Quick select:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {quickLocations.map((location) => (
+            <button
+              key={`${locationField}-${location.label}`}
+              type="button"
+              aria-label={`Set ${fieldLabel} to ${location.label}`}
+              onClick={() =>
+                applyQuickLocation({
+                  locationField,
+                  placeIdField,
+                  addressField,
+                  latField,
+                  lngField,
+                  value: location.value,
+                })
+              }
+              className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 transition hover:bg-slate-100"
+            >
+              {location.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const calculateEstimate = useCallback(async (source: "auto" | "manual" = "manual") => {
@@ -473,65 +523,31 @@ export default function QuoteForm() {
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <PlaceAutocompleteInput label="Outward pickup location" required locationNameField="pickupLocation" placeIdField="pickupPlaceId" addressField="pickupAddress" latField="pickupLat" lngField="pickupLng" defaultValue={formState.pickupLocation || ""} />
+            {renderQuickSelectButtons({
+              fieldLabel: "outward pickup",
+              locationField: "pickupLocation",
+              placeIdField: "pickupPlaceId",
+              addressField: "pickupAddress",
+              latField: "pickupLat",
+              lngField: "pickupLng",
+            })}
             {outwardAirportPickup ? (
               <div className="space-y-1">
                 <InputField label="Flight number" name="outwardFlightNumber" placeholder="e.g. EI123, BA1416" defaultValue={formState.outwardFlightNumber || ""} />
                 <p className="text-xs text-slate-500">This helps us monitor arrivals and plan pickup timing.</p>
               </div>
             ) : null}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">Quick select:</p>
-              <div className="flex flex-wrap gap-2">
-                {quickLocations.map((location) => (
-                  <button
-                    key={`pickup-${location.label}`}
-                    type="button"
-                    aria-label={`Set pickup location to ${location.label}`}
-                    onClick={() =>
-                      applyQuickLocation({
-                        locationField: "pickupLocation",
-                        placeIdField: "pickupPlaceId",
-                        addressField: "pickupAddress",
-                        latField: "pickupLat",
-                        lngField: "pickupLng",
-                        value: location.value,
-                      })
-                    }
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                  >
-                    {location.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
           <div className="space-y-2">
             <PlaceAutocompleteInput label="Outward drop-off location" required locationNameField="dropoffLocation" placeIdField="dropoffPlaceId" addressField="dropoffAddress" latField="dropoffLat" lngField="dropoffLng" defaultValue={formState.dropoffLocation || ""} />
-            <div className="space-y-1">
-              <p className="text-xs text-slate-500">Quick select:</p>
-              <div className="flex flex-wrap gap-2">
-                {quickLocations.map((location) => (
-                  <button
-                    key={`dropoff-${location.label}`}
-                    type="button"
-                    aria-label={`Set drop-off location to ${location.label}`}
-                    onClick={() =>
-                      applyQuickLocation({
-                        locationField: "dropoffLocation",
-                        placeIdField: "dropoffPlaceId",
-                        addressField: "dropoffAddress",
-                        latField: "dropoffLat",
-                        lngField: "dropoffLng",
-                        value: location.value,
-                      })
-                    }
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                  >
-                    {location.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {renderQuickSelectButtons({
+              fieldLabel: "outward drop-off",
+              locationField: "dropoffLocation",
+              placeIdField: "dropoffPlaceId",
+              addressField: "dropoffAddress",
+              latField: "dropoffLat",
+              lngField: "dropoffLng",
+            })}
           </div>
           <InputField label="Outward date" name="pickupDate" type="date" required defaultValue={formState.pickupDate || ""} />
           <InputField label="Outward time" name="pickupTime" type="time" required defaultValue={formState.pickupTime || ""} />
@@ -549,60 +565,26 @@ export default function QuoteForm() {
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
               <PlaceAutocompleteInput label="Return pickup location" required locationNameField="returnPickupLocation" placeIdField="returnPickupPlaceId" addressField="returnPickupAddress" latField="returnPickupLat" lngField="returnPickupLng" defaultValueFieldName="dropoffLocation" defaultValue={formState.returnPickupLocation || ""} />
+              {renderQuickSelectButtons({
+                fieldLabel: "return pickup",
+                locationField: "returnPickupLocation",
+                placeIdField: "returnPickupPlaceId",
+                addressField: "returnPickupAddress",
+                latField: "returnPickupLat",
+                lngField: "returnPickupLng",
+              })}
               {returnAirportPickup ? <InputField label="Return flight number" name="returnFlightNumber" placeholder="e.g. EI123, BA1416" defaultValue={formState.returnFlightNumber || ""} /> : null}
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">Quick select:</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickLocations.map((location) => (
-                    <button
-                      key={`return-pickup-${location.label}`}
-                      type="button"
-                      aria-label={`Set return pickup location to ${location.label}`}
-                      onClick={() =>
-                        applyQuickLocation({
-                          locationField: "returnPickupLocation",
-                          placeIdField: "returnPickupPlaceId",
-                          addressField: "returnPickupAddress",
-                          latField: "returnPickupLat",
-                          lngField: "returnPickupLng",
-                          value: location.value,
-                        })
-                      }
-                      className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                    >
-                      {location.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
             <div className="space-y-2">
               <PlaceAutocompleteInput label="Return drop-off location" required locationNameField="returnDropoffLocation" placeIdField="returnDropoffPlaceId" addressField="returnDropoffAddress" latField="returnDropoffLat" lngField="returnDropoffLng" defaultValueFieldName="pickupLocation" defaultValue={formState.returnDropoffLocation || ""} />
-              <div className="space-y-1">
-                <p className="text-xs text-slate-500">Quick select:</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickLocations.map((location) => (
-                    <button
-                      key={`return-dropoff-${location.label}`}
-                      type="button"
-                      aria-label={`Set return drop-off location to ${location.label}`}
-                      onClick={() =>
-                        applyQuickLocation({
-                          locationField: "returnDropoffLocation",
-                          placeIdField: "returnDropoffPlaceId",
-                          addressField: "returnDropoffAddress",
-                          latField: "returnDropoffLat",
-                          lngField: "returnDropoffLng",
-                          value: location.value,
-                        })
-                      }
-                      className="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                    >
-                      {location.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {renderQuickSelectButtons({
+                fieldLabel: "return drop-off",
+                locationField: "returnDropoffLocation",
+                placeIdField: "returnDropoffPlaceId",
+                addressField: "returnDropoffAddress",
+                latField: "returnDropoffLat",
+                lngField: "returnDropoffLng",
+              })}
             </div>
             <InputField label="Return date" name="returnDate" type="date" required defaultValue={formState.returnDate || ""} />
             <InputField label="Return time" name="returnTime" type="time" required defaultValue={formState.returnTime || ""} />

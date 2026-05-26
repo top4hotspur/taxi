@@ -41,15 +41,15 @@ type Settings = {
 };
 
 const defaultSettings: Settings = {
-  baseFare: 10,
-  perMile: 2.2,
-  perMinute: 0.35,
-  minimumFare: 25,
+  baseFare: 5,
+  perMile: 1.8,
+  perMinute: 0.15,
+  minimumFare: 12,
   currency: "GBP",
   airportSurchargeAmount: 5,
   standardPassengerMax: 4,
-  passengerBand_5_6_UpliftPercent: 0,
-  passengerBand_7_8_UpliftPercent: 0,
+  passengerBand_5_6_UpliftPercent: 25,
+  passengerBand_7_8_UpliftPercent: 50,
   airportUpliftPercent: 0,
   dublinAirportUpliftPercent: 0,
   golfBagSurcharge: 0,
@@ -69,6 +69,7 @@ export default function AdminPricingPage() {
   const [timeUplifts, setTimeUplifts] = useState<TimeUplift[]>(defaultTimeBands);
   const [dateUplifts, setDateUplifts] = useState<DateUplift[]>([]);
   const [message, setMessage] = useState("");
+  const [preview, setPreview] = useState({ miles: 8, minutes: 20, passengers: 2, airport: true });
 
   useEffect(() => {
     fetch("/api/admin/pricing").then(async (res) => {
@@ -138,6 +139,23 @@ export default function AdminPricingPage() {
       </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <h2 className="text-lg font-semibold">Example calculation preview</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <NumberField label="Distance miles" value={preview.miles} onChange={(v) => setPreview({ ...preview, miles: v })} />
+          <NumberField label="Minutes" value={preview.minutes} onChange={(v) => setPreview({ ...preview, minutes: v })} />
+          <NumberField label="Passengers" value={preview.passengers} onChange={(v) => setPreview({ ...preview, passengers: v })} />
+          <label className="inline-flex items-end gap-2 pb-2 text-sm">
+            <input type="checkbox" checked={preview.airport} onChange={(e) => setPreview({ ...preview, airport: e.target.checked })} />
+            Airport journey
+          </label>
+          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm">
+            <p className="font-semibold">Estimate: {formatPreviewFare(settings, preview)}</p>
+            <p className="text-xs text-slate-600">Uses current base, mileage, time, airport, and passenger uplift values.</p>
+          </div>
+        </div>
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <h2 className="text-lg font-semibold">Time uplifts</h2>
         <div className="space-y-3">
           {timeUplifts.map((rule, index) => (
@@ -194,6 +212,23 @@ export default function AdminPricingPage() {
       {message && <p className="text-sm text-slate-700">{message}</p>}
     </section>
   );
+}
+
+function formatPreviewFare(settings: Settings, preview: { miles: number; minutes: number; passengers: number; airport: boolean }) {
+  const baseFare = Number(settings.baseFare || 0);
+  const distanceCharge = Number(preview.miles || 0) * Number(settings.perMile || 0);
+  const timeCharge = Number(preview.minutes || 0) * Number(settings.perMinute || 0);
+  const preMinimum = baseFare + distanceCharge + timeCharge;
+  const minimumAppliedFare = Math.max(preMinimum, Number(settings.minimumFare || 0));
+  const airportSurcharge = preview.airport ? Number(settings.airportSurchargeAmount || 0) : 0;
+  const passengerUpliftPercent = preview.passengers >= 7
+    ? Number(settings.passengerBand_7_8_UpliftPercent || 0)
+    : preview.passengers >= 5
+      ? Number(settings.passengerBand_5_6_UpliftPercent || 0)
+      : 0;
+  const subtotal = minimumAppliedFare + airportSurcharge;
+  const total = subtotal + (subtotal * passengerUpliftPercent) / 100;
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency: settings.currency || "GBP" }).format(Number(total.toFixed(2)));
 }
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {

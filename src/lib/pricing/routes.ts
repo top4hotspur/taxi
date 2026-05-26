@@ -1,8 +1,10 @@
 export interface RouteEstimateInput {
   pickupPlaceId?: string;
+  pickupAddress?: string;
   pickupLat?: number;
   pickupLng?: number;
   dropoffPlaceId?: string;
+  dropoffAddress?: string;
   dropoffLat?: number;
   dropoffLng?: number;
 }
@@ -25,7 +27,7 @@ export class RoutesApiError extends Error {
   }
 }
 
-function toWaypoint(placeId?: string, lat?: number, lng?: number) {
+function toWaypoint(placeId?: string, lat?: number, lng?: number, address?: string) {
   if (placeId) {
     return { placeId };
   }
@@ -39,6 +41,11 @@ function toWaypoint(placeId?: string, lat?: number, lng?: number) {
         },
       },
     };
+  }
+
+  const cleanAddress = String(address || "").trim();
+  if (cleanAddress) {
+    return { address: cleanAddress };
   }
 
   return null;
@@ -56,11 +63,11 @@ export async function computeRouteEstimate(input: RouteEstimateInput): Promise<R
     throw new RoutesApiError("ROUTES_CONFIG_MISSING", "Google Routes API key is not configured.");
   }
 
-  const origin = toWaypoint(input.pickupPlaceId, input.pickupLat, input.pickupLng);
-  const destination = toWaypoint(input.dropoffPlaceId, input.dropoffLat, input.dropoffLng);
+  const origin = toWaypoint(input.pickupPlaceId, input.pickupLat, input.pickupLng, input.pickupAddress);
+  const destination = toWaypoint(input.dropoffPlaceId, input.dropoffLat, input.dropoffLng, input.dropoffAddress);
 
   if (!origin || !destination) {
-    throw new RoutesApiError("ROUTES_INPUT_INVALID", "Pickup/drop-off coordinates or place IDs are required.");
+    throw new RoutesApiError("ROUTES_INPUT_INVALID", "Pickup/drop-off coordinates, place IDs, or address text are required.");
   }
 
   const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
@@ -93,6 +100,19 @@ export async function computeRouteEstimate(input: RouteEstimateInput): Promise<R
   }
 
   if (!response.ok) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "pricing.routes",
+        errorCode: "ROUTES_API_FAILED",
+        httpStatus: response.status,
+        googleErrorMessage: parsed.error?.message || null,
+        originMode: input.pickupPlaceId ? "placeId" : Number.isFinite(input.pickupLat) && Number.isFinite(input.pickupLng) ? "latLng" : "address",
+        destinationMode: input.dropoffPlaceId ? "placeId" : Number.isFinite(input.dropoffLat) && Number.isFinite(input.dropoffLng) ? "latLng" : "address",
+        pickupAddress: input.pickupAddress || null,
+        dropoffAddress: input.dropoffAddress || null,
+      })
+    );
     throw new RoutesApiError(
       "ROUTES_API_FAILED",
       parsed.error?.message || `Google Routes API request failed with status ${response.status}.`
@@ -101,6 +121,18 @@ export async function computeRouteEstimate(input: RouteEstimateInput): Promise<R
 
   const route = parsed.routes?.[0];
   if (!route || !Number.isFinite(route.distanceMeters)) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        source: "pricing.routes",
+        errorCode: "ROUTES_NOT_FOUND",
+        originMode: input.pickupPlaceId ? "placeId" : Number.isFinite(input.pickupLat) && Number.isFinite(input.pickupLng) ? "latLng" : "address",
+        destinationMode: input.dropoffPlaceId ? "placeId" : Number.isFinite(input.dropoffLat) && Number.isFinite(input.dropoffLng) ? "latLng" : "address",
+        pickupAddress: input.pickupAddress || null,
+        dropoffAddress: input.dropoffAddress || null,
+        routeCount: parsed.routes?.length || 0,
+      })
+    );
     throw new RoutesApiError("ROUTES_NOT_FOUND", "No valid route returned for this journey.");
   }
 

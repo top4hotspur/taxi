@@ -66,12 +66,35 @@ export async function POST(request: Request) {
 
     const outboundRoute = await computeRouteEstimate({
       pickupPlaceId: String(body.pickupPlaceId || "") || undefined,
+      pickupAddress: pickupLocation,
       pickupLat: Number.isFinite(pickupLat) ? pickupLat : undefined,
       pickupLng: Number.isFinite(pickupLng) ? pickupLng : undefined,
       dropoffPlaceId: String(body.dropoffPlaceId || "") || undefined,
+      dropoffAddress: dropoffLocation,
       dropoffLat: Number.isFinite(dropoffLat) ? dropoffLat : undefined,
       dropoffLng: Number.isFinite(dropoffLng) ? dropoffLng : undefined,
     });
+
+    if (
+      outboundRoute.distanceMiles > 50 &&
+      `${pickupLocation} ${dropoffLocation}`.toLowerCase().includes("belfast")
+    ) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          source: "api.pricing.estimate",
+          warning: "SUSPICIOUS_BELFAST_ROUTE_DISTANCE",
+          pickupLocation,
+          dropoffLocation,
+          distanceMiles: outboundRoute.distanceMiles,
+          durationMinutes: outboundRoute.durationMinutes,
+          pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
+          dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
+          pickupLatLngPresent: Number.isFinite(pickupLat) && Number.isFinite(pickupLng),
+          dropoffLatLngPresent: Number.isFinite(dropoffLat) && Number.isFinite(dropoffLng),
+        })
+      );
+    }
 
     const pricingConfig = await getEffectivePricingConfig();
     const outwardFare = estimateFare({
@@ -121,9 +144,11 @@ export async function POST(request: Request) {
 
       returnRoute = await computeRouteEstimate({
         pickupPlaceId: String(body.returnPickupPlaceId || "") || undefined,
+        pickupAddress: returnPickupLocation,
         pickupLat: Number.isFinite(returnPickupLat) ? returnPickupLat : undefined,
         pickupLng: Number.isFinite(returnPickupLng) ? returnPickupLng : undefined,
         dropoffPlaceId: String(body.returnDropoffPlaceId || "") || undefined,
+        dropoffAddress: returnDropoffLocation,
         dropoffLat: Number.isFinite(returnDropoffLat) ? returnDropoffLat : undefined,
         dropoffLng: Number.isFinite(returnDropoffLng) ? returnDropoffLng : undefined,
       });
@@ -191,6 +216,16 @@ export async function POST(request: Request) {
         message: error instanceof Error ? error.message : "Unknown pricing error",
         pickupLocation: String(body.pickupLocation || ""),
         dropoffLocation: String(body.dropoffLocation || ""),
+        diagnostics: {
+          originTextUsed: String(body.pickupLocation || ""),
+          destinationTextUsed: String(body.dropoffLocation || ""),
+          returnOriginTextUsed: String(body.returnPickupLocation || ""),
+          returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
+          pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
+          dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
+          pickupLatLngPresent: Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
+          dropoffLatLngPresent: Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
+        },
       })
     );
 
@@ -212,6 +247,17 @@ export async function POST(request: Request) {
               : "Route estimate could not be calculated automatically.",
           customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
           errorCode: error.code,
+          diagnostics: {
+            originTextUsed: String(body.pickupLocation || ""),
+            destinationTextUsed: String(body.dropoffLocation || ""),
+            returnOriginTextUsed: String(body.returnPickupLocation || ""),
+            returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
+            pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
+            dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
+            pickupLatLngPresent: Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
+            dropoffLatLngPresent: Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
+            googleRoutesErrorCode: error.code,
+          },
         },
         { status: 200 }
       );
@@ -231,6 +277,16 @@ export async function POST(request: Request) {
         routeEstimateFailureReason: "Automatic route pricing is temporarily unavailable.",
         customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
         errorCode: "PRICING_ESTIMATE_FAILED",
+        diagnostics: {
+          originTextUsed: String(body.pickupLocation || ""),
+          destinationTextUsed: String(body.dropoffLocation || ""),
+          returnOriginTextUsed: String(body.returnPickupLocation || ""),
+          returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
+          pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
+          dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
+          pickupLatLngPresent: Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
+          dropoffLatLngPresent: Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
+        },
       },
       { status: 200 }
     );
