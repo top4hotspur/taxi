@@ -173,6 +173,15 @@ export default function AccountQuoteDetail() {
           <p className="text-lg font-semibold">Payment received</p>
           <p>Paid amount: {formatMoney(quote.paymentAmount ?? model.confirmedAmount, quote.paymentCurrency || model.confirmedCurrency)}</p>
           <p>Paid at: {formatUkDateTime(quote.paidAt)}</p>
+          <p>Your payment has been received. You can download your invoice below.</p>
+          <div>
+            <a
+              href={`/api/account/quotes/${encodeURIComponent(quote.id)}/invoice`}
+              className="inline-flex rounded-full border border-emerald-700 bg-white px-4 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+            >
+              Download invoice
+            </a>
+          </div>
           {!quote.assignedDriverId ? (
             <p>Your booking request is now paid and awaiting final driver confirmation.</p>
           ) : (

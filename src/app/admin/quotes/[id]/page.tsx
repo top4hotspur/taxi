@@ -505,6 +505,12 @@ export default function AdminQuoteDetailPage() {
           <p>Amount paid: {formatMoney(quote.paymentAmount ?? quote.confirmedPrice ?? quote.quotedPrice, quote.paymentCurrency || quote.confirmedCurrency || quote.quotedCurrency || "GBP")}</p>
           <p>Paid at: {quote.paidAt ? formatUkDateTime(quote.paidAt) : "Not available"}</p>
           <p>Square payment ID: {quote.squarePaymentId || "Not available"}</p>
+          <a
+            href={`/api/admin/quotes/${encodeURIComponent(quote.id)}/invoice`}
+            className="mt-2 inline-flex rounded-full border border-emerald-700 bg-white px-4 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+          >
+            Download invoice
+          </a>
         </article>
       ) : null}
 
