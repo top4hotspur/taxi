@@ -94,36 +94,78 @@ interface PlaceAutocompleteInputProps {
   lngField: string;
   defaultValueFieldName?: string;
   defaultValue?: string;
+  locationValue?: string;
+  placeIdValue?: string;
+  addressValue?: string;
+  latValue?: string;
+  lngValue?: string;
+  onLocationValueChange?: (fieldName: string, value: string) => void;
+  onStructuredPlaceChange?: (
+    locationFieldName: string,
+    values: { placeId: string; address: string; lat: string; lng: string }
+  ) => void;
 }
 
 export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProps) {
+  const {
+    label,
+    required,
+    locationNameField,
+    placeIdField,
+    addressField,
+    latField,
+    lngField,
+    defaultValueFieldName,
+    defaultValue,
+    locationValue,
+    placeIdValue,
+    addressValue,
+    latValue,
+    lngValue,
+    onLocationValueChange,
+    onStructuredPlaceChange,
+  } = props;
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const placeSelectionEventRef = useRef(false);
   const inputId = useId();
   const [scriptReady, setScriptReady] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState("");
   const [selectedAddress, setSelectedAddress] = useState("");
   const [selectedLat, setSelectedLat] = useState("");
   const [selectedLng, setSelectedLng] = useState("");
+  const [inputValue, setInputValue] = useState(locationValue ?? defaultValue ?? "");
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [diagReason, setDiagReason] = useState<DiagnosticReason>(apiKey ? null : "API_KEY_MISSING");
   const [diagDetail, setDiagDetail] = useState<string | null>(apiKey ? null : "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is missing.");
   const isDebugMode = process.env.NODE_ENV !== "production";
 
+  const effectiveInputValue = typeof locationValue === "string" ? locationValue : inputValue;
+  const effectivePlaceId = typeof placeIdValue === "string" ? placeIdValue : selectedPlaceId;
+  const effectiveAddress = typeof addressValue === "string" ? addressValue : selectedAddress;
+  const effectiveLat = typeof latValue === "string" ? latValue : selectedLat;
+  const effectiveLng = typeof lngValue === "string" ? lngValue : selectedLng;
+
   useEffect(() => {
     const clearStructuredPlace = (event: Event) => {
       const detail = (event as CustomEvent<{ fieldName?: string }>).detail;
-      if (detail?.fieldName !== props.locationNameField) return;
+      if (detail?.fieldName !== locationNameField) return;
       setSelectedPlaceId("");
       setSelectedAddress("");
       setSelectedLat("");
       setSelectedLng("");
+      onStructuredPlaceChange?.(locationNameField, {
+        placeId: "",
+        address: "",
+        lat: "",
+        lng: "",
+      });
     };
 
     window.addEventListener(CLEAR_EVENT, clearStructuredPlace);
     return () => {
       window.removeEventListener(CLEAR_EVENT, clearStructuredPlace);
     };
-  }, [props.locationNameField]);
+  }, [locationNameField, onStructuredPlaceChange]);
 
   useEffect(() => {
     const onWindowError = (event: ErrorEvent) => {
@@ -212,9 +254,19 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
       if (place.name && input && !input.value.trim()) {
         input.value = place.name;
       }
+      const nextInputValue = input?.value || place.formatted_address || place.name || "";
+      setInputValue(nextInputValue);
+      onLocationValueChange?.(locationNameField, nextInputValue);
+      onStructuredPlaceChange?.(locationNameField, {
+        placeId: place.place_id || "",
+        address: place.formatted_address || "",
+        lat: typeof lat === "number" ? String(lat) : "",
+        lng: typeof lng === "number" ? String(lng) : "",
+      });
+      placeSelectionEventRef.current = true;
       input?.dispatchEvent(new Event("input", { bubbles: true }));
     });
-  }, [scriptReady]);
+  }, [locationNameField, onLocationValueChange, onStructuredPlaceChange, scriptReady]);
 
   useEffect(() => {
     const hasGoogle = Boolean(window.google?.maps);
@@ -223,23 +275,25 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
 
     console.warn("[place-autocomplete-diagnostics]", {
       component: COMPONENT_NAME,
-      fieldName: props.locationNameField,
+      fieldName: locationNameField,
       scriptLoaded: scriptReady,
       hasGoogle,
       hasPlaces,
       diagnosticReason: diagReason,
       error: message || null,
     });
-  }, [diagDetail, diagReason, props.locationNameField, scriptReady]);
+  }, [diagDetail, diagReason, locationNameField, scriptReady]);
 
   useEffect(() => {
-    if (!props.defaultValueFieldName || !inputRef.current) return;
-    const sourceInput = document.querySelector<HTMLInputElement>(`input[name="${props.defaultValueFieldName}"]`);
+    if (!defaultValueFieldName || !inputRef.current) return;
+    const sourceInput = document.querySelector<HTMLInputElement>(`input[name="${defaultValueFieldName}"]`);
     if (!sourceInput) return;
     const applyDefault = () => {
       if (!inputRef.current) return;
-      if (!inputRef.current.value.trim()) {
-        inputRef.current.value = sourceInput.value || "";
+      if (!effectiveInputValue.trim()) {
+        const next = sourceInput.value || "";
+        setInputValue(next);
+        onLocationValueChange?.(locationNameField, next);
       }
     };
     applyDefault();
@@ -247,7 +301,7 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
     return () => {
       sourceInput.removeEventListener("input", applyDefault);
     };
-  }, [props.defaultValueFieldName]);
+  }, [defaultValueFieldName, effectiveInputValue, locationNameField, onLocationValueChange]);
 
   const showFallback = !scriptReady;
   const fallbackReason = diagDetail || diagnosticMessage(diagReason);
@@ -255,21 +309,41 @@ export default function PlaceAutocompleteInput(props: PlaceAutocompleteInputProp
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-800" htmlFor={inputId}>
-        {props.label}
+        {label}
       </label>
       <input
         id={inputId}
         ref={inputRef}
-        name={props.locationNameField}
-        defaultValue={props.defaultValue || ""}
-        required={props.required}
+        name={locationNameField}
+        value={effectiveInputValue}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          setInputValue(nextValue);
+          if (placeSelectionEventRef.current) {
+            placeSelectionEventRef.current = false;
+            onLocationValueChange?.(locationNameField, nextValue);
+            return;
+          }
+          setSelectedPlaceId("");
+          setSelectedAddress("");
+          setSelectedLat("");
+          setSelectedLng("");
+          onLocationValueChange?.(locationNameField, nextValue);
+          onStructuredPlaceChange?.(locationNameField, {
+            placeId: "",
+            address: "",
+            lat: "",
+            lng: "",
+          });
+        }}
+        required={required}
         placeholder={showFallback ? "Enter location manually" : "Search location"}
         className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none ring-amber-400 transition focus:ring-2"
       />
-      <input type="hidden" name={props.placeIdField} value={selectedPlaceId} />
-      <input type="hidden" name={props.addressField} value={selectedAddress} />
-      <input type="hidden" name={props.latField} value={selectedLat} />
-      <input type="hidden" name={props.lngField} value={selectedLng} />
+      <input type="hidden" name={placeIdField} value={effectivePlaceId} />
+      <input type="hidden" name={addressField} value={effectiveAddress} />
+      <input type="hidden" name={latField} value={effectiveLat} />
+      <input type="hidden" name={lngField} value={effectiveLng} />
       {showFallback && (
         <p className="mt-1 text-xs text-slate-600">Address search unavailable - manual entry is still supported.</p>
       )}

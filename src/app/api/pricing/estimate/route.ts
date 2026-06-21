@@ -3,6 +3,40 @@ import { estimateFare } from "@/lib/pricing/fare";
 import { computeRouteEstimate, RoutesApiError } from "@/lib/pricing/routes";
 import { getEffectivePricingConfig } from "@/lib/pricing/settings";
 
+type FailureReason =
+  | "MISSING_PICKUP"
+  | "MISSING_DROPOFF"
+  | "GOOGLE_NO_ROUTE"
+  | "GOOGLE_DISTANCE_DURATION_MISSING"
+  | "GOOGLE_API_ERROR"
+  | "INTERNAL_ESTIMATE_ERROR";
+
+function buildDiagnostics(body: Record<string, unknown>, extra?: Record<string, unknown>) {
+  return {
+    originTextUsed: String(body.pickupLocation || ""),
+    destinationTextUsed: String(body.dropoffLocation || ""),
+    returnOriginTextUsed: String(body.returnPickupLocation || ""),
+    returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
+    quickSelectSourceByField:
+      typeof body.quickSelectSourceByField === "object" && body.quickSelectSourceByField
+        ? body.quickSelectSourceByField
+        : null,
+    pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
+    dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
+    returnPickupPlaceIdPresent: Boolean(String(body.returnPickupPlaceId || "")),
+    returnDropoffPlaceIdPresent: Boolean(String(body.returnDropoffPlaceId || "")),
+    pickupLatLngPresent:
+      Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
+    dropoffLatLngPresent:
+      Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
+    returnPickupLatLngPresent:
+      Number.isFinite(Number(body.returnPickupLat)) && Number.isFinite(Number(body.returnPickupLng)),
+    returnDropoffLatLngPresent:
+      Number.isFinite(Number(body.returnDropoffLat)) && Number.isFinite(Number(body.returnDropoffLng)),
+    ...extra,
+  };
+}
+
 export async function POST(request: Request) {
   let body: Record<string, unknown> = {};
   try {
@@ -44,7 +78,7 @@ export async function POST(request: Request) {
 
     const pickupLocation = String(body.pickupLocation || "").trim();
     const dropoffLocation = String(body.dropoffLocation || "").trim();
-    if (!pickupLocation || !dropoffLocation) {
+    if (!pickupLocation) {
       return NextResponse.json(
         {
           ok: true,
@@ -56,9 +90,30 @@ export async function POST(request: Request) {
           pricingSource: "FALLBACK_MANUAL_REVIEW",
           requiresManualReview: true,
           routeEstimateFailed: true,
-          routeEstimateFailureReason: "Route details were incomplete.",
+          routeEstimateFailureReason: "MISSING_PICKUP",
           customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
           errorCode: "ROUTES_INPUT_INVALID",
+          diagnostics: buildDiagnostics(body, { failureReason: "MISSING_PICKUP" satisfies FailureReason }),
+        },
+        { status: 200 }
+      );
+    }
+    if (!dropoffLocation) {
+      return NextResponse.json(
+        {
+          ok: true,
+          estimatedFare: null,
+          currency: "GBP",
+          distanceMiles: null,
+          durationMinutes: null,
+          fareBreakdown: null,
+          pricingSource: "FALLBACK_MANUAL_REVIEW",
+          requiresManualReview: true,
+          routeEstimateFailed: true,
+          routeEstimateFailureReason: "MISSING_DROPOFF",
+          customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
+          errorCode: "ROUTES_INPUT_INVALID",
+          diagnostics: buildDiagnostics(body, { failureReason: "MISSING_DROPOFF" satisfies FailureReason }),
         },
         { status: 200 }
       );
@@ -129,9 +184,10 @@ export async function POST(request: Request) {
             pricingSource: "FALLBACK_MANUAL_REVIEW",
             requiresManualReview: true,
             routeEstimateFailed: true,
-            routeEstimateFailureReason: "Return journey details were incomplete.",
+            routeEstimateFailureReason: "GOOGLE_API_ERROR",
             customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
             errorCode: "ROUTES_INPUT_INVALID",
+            diagnostics: buildDiagnostics(body, { failureReason: "GOOGLE_API_ERROR" satisfies FailureReason }),
           },
           { status: 200 }
         );
@@ -216,20 +272,17 @@ export async function POST(request: Request) {
         message: error instanceof Error ? error.message : "Unknown pricing error",
         pickupLocation: String(body.pickupLocation || ""),
         dropoffLocation: String(body.dropoffLocation || ""),
-        diagnostics: {
-          originTextUsed: String(body.pickupLocation || ""),
-          destinationTextUsed: String(body.dropoffLocation || ""),
-          returnOriginTextUsed: String(body.returnPickupLocation || ""),
-          returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
-          pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
-          dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
-          pickupLatLngPresent: Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
-          dropoffLatLngPresent: Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
-        },
+        diagnostics: buildDiagnostics(body),
       })
     );
 
     if (error instanceof RoutesApiError) {
+      const failureReason: FailureReason =
+        error.code === "ROUTES_NOT_FOUND"
+          ? "GOOGLE_NO_ROUTE"
+          : error.code === "ROUTES_DISTANCE_MISSING" || error.code === "ROUTES_DURATION_MISSING"
+            ? "GOOGLE_DISTANCE_DURATION_MISSING"
+            : "GOOGLE_API_ERROR";
       return NextResponse.json(
         {
           ok: true,
@@ -241,23 +294,10 @@ export async function POST(request: Request) {
           pricingSource: "FALLBACK_MANUAL_REVIEW",
           requiresManualReview: true,
           routeEstimateFailed: true,
-          routeEstimateFailureReason:
-            error.code === "ROUTES_CONFIG_MISSING"
-              ? "Automatic route pricing is temporarily unavailable."
-              : "Route estimate could not be calculated automatically.",
+          routeEstimateFailureReason: failureReason,
           customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
           errorCode: error.code,
-          diagnostics: {
-            originTextUsed: String(body.pickupLocation || ""),
-            destinationTextUsed: String(body.dropoffLocation || ""),
-            returnOriginTextUsed: String(body.returnPickupLocation || ""),
-            returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
-            pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
-            dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
-            pickupLatLngPresent: Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
-            dropoffLatLngPresent: Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
-            googleRoutesErrorCode: error.code,
-          },
+          diagnostics: buildDiagnostics(body, { googleRoutesErrorCode: error.code, failureReason }),
         },
         { status: 200 }
       );
@@ -274,19 +314,10 @@ export async function POST(request: Request) {
         pricingSource: "FALLBACK_MANUAL_REVIEW",
         requiresManualReview: true,
         routeEstimateFailed: true,
-        routeEstimateFailureReason: "Automatic route pricing is temporarily unavailable.",
+        routeEstimateFailureReason: "INTERNAL_ESTIMATE_ERROR",
         customerMessage: "We couldn't calculate this route automatically. Submit your request and we'll confirm the price manually.",
         errorCode: "PRICING_ESTIMATE_FAILED",
-        diagnostics: {
-          originTextUsed: String(body.pickupLocation || ""),
-          destinationTextUsed: String(body.dropoffLocation || ""),
-          returnOriginTextUsed: String(body.returnPickupLocation || ""),
-          returnDestinationTextUsed: String(body.returnDropoffLocation || ""),
-          pickupPlaceIdPresent: Boolean(String(body.pickupPlaceId || "")),
-          dropoffPlaceIdPresent: Boolean(String(body.dropoffPlaceId || "")),
-          pickupLatLngPresent: Number.isFinite(Number(body.pickupLat)) && Number.isFinite(Number(body.pickupLng)),
-          dropoffLatLngPresent: Number.isFinite(Number(body.dropoffLat)) && Number.isFinite(Number(body.dropoffLng)),
-        },
+        diagnostics: buildDiagnostics(body, { failureReason: "INTERNAL_ESTIMATE_ERROR" satisfies FailureReason }),
       },
       { status: 200 }
     );
